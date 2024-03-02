@@ -1,75 +1,147 @@
+import customtkinter as ctk
 import tkinter as tk
-import customtkinter
-import actions
+from tkinter import filedialog
+from PIL import Image, ImageTk
 
-customtkinter.set_appearance_mode("System")
-customtkinter.set_default_color_theme("dark-blue")
-
-# define main window
-root_tk = tk.Tk()
-root_tk.title("MRI Analyzer beta")
+root = ctk.CTk()
 
 # Window dimensions and centering
-window_width = 900
+window_width = 1000
 window_height = 600
-screen_width = root_tk.winfo_screenwidth()
-screen_height = root_tk.winfo_screenheight()
+screen_width = root.winfo_screenwidth()
+screen_height = root.winfo_screenheight()
 x = (screen_width - window_width) // 2
 y = (screen_height - window_height) // 2
-root_tk.geometry(f"{window_width}x{window_height}+{x}+{y}")
+root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+root.title("MRI Segmentation Tool")
 
-# main frame canva
-main_frame = customtkinter.CTkFrame(master=root_tk)
-main_frame.pack(fill=tk.BOTH, expand=True)
+pen_color = ""
+pen_size = 25
+file_path = ""
 
-# Left frame of the canva, holds the logo and the buttons
-left_frame = customtkinter.CTkFrame(master=main_frame)
-left_frame.grid(row=0, column=0, sticky="nsew")
-left_frame.columnconfigure(0, weight=1)
+
+def add_image():
+    global file_path, pen_color
+    file_path = filedialog.askopenfilename()
+    if file_path:
+        try:
+            image = Image.open(file_path)
+            width, height = int(image.width / 2), int(image.height / 2)
+            image = image.resize((width, height))
+            canvas.config(width=image.width, height=image.height)
+            image = ImageTk.PhotoImage(image)
+            canvas.image = image
+            canvas.create_image(0, 0, image=image, anchor="nw")
+            mode_switch.configure(state="normal")
+            pen_size_scale.configure(state="normal")
+            clear_button.configure(state="normal")
+            process_segmentation_button.configure(state="normal")
+            pen_color="green3"
+        except Exception as e:
+            print("Error loading image:", e)
+    else:
+        print("No file selected")
+        
+def change_pen_size(val):
+    global pen_size
+    pen_size = int(val)
+    
+def include():
+    global pen_color
+    pen_color = "green3"
+    
+def exclude():
+    global pen_color
+    pen_color = "red"
+
+def draw(event):
+    global last_x, last_y
+    x, y = event.x, event.y
+    canvas.create_line(last_x, last_y, x, y, fill=pen_color, width=pen_size*2, capstyle="round", smooth=True)
+    last_x, last_y = x, y
+
+def start_draw(event):
+    global last_x, last_y
+    last_x, last_y = event.x, event.y
+
+def end_draw(event):
+    pass
+ 
+def clear_canvas():
+    global pen_size, pen_color
+    canvas.delete("all")
+    canvas.create_image(0, 0, image=canvas.image, anchor="nw")
+    pen_size = 25
+    pen_size_scale.set(25)
+    #pen_color = ""
+    mode_switch.select()
+
+def process_segmentation():
+    print("Work in progress jeje")
+    
+# left Frame which contains the tools and options
+left_frame = ctk.CTkFrame(root, height=600)
+left_frame.pack(padx= 15, side='left', fill='y')
+
+# Canvas Area on the rest of the window
+canvas = ctk.CTkCanvas(root, width=750, height=600)
+canvas.pack()
 
 # Logo
-logo_frame = customtkinter.CTkFrame(master=left_frame)
+logo_frame = ctk.CTkFrame(master=left_frame)
 logo_frame.grid(row=0, pady=10, padx=30)
-
-# Canvas for logo
-canvas = tk.Canvas(master=logo_frame, width=100, height=100)
-canvas.grid(row=0)
+canvas_logo = tk.Canvas(master=logo_frame, width=100, height=100)
+canvas_logo.grid(row=0)
 logo_image = tk.PhotoImage(file="images/logo.png").subsample(4, 4)
-canvas.create_image(50, 50, image=logo_image)
+canvas_logo.create_image(50, 50, image=logo_image)
+logo_frame.pack(pady=15)
 
-# Title "MRI Analyzer" under the logo
-title_label = tk.Label(logo_frame, text="MRI Analyzer beta")
+# Title of the tool under the logo
+title_label = ctk.CTkLabel(logo_frame, text="MRI Slice \n Segmentation Tool \n (beta)")
 title_label.grid(row=1)
 
-# Left frame buttons
-buttons_frame = customtkinter.CTkFrame(master=left_frame)
-buttons_frame.grid(row=1, column=0, sticky="nsew")
+# Upload Button
+upload_button = ctk.CTkButton(left_frame, text='Upload Image', command=add_image)
+upload_button.pack(pady=15)
 
-button_upload_image = customtkinter.CTkButton(master=buttons_frame, corner_radius=10, text="Upload Image", command=actions.upload_image)
-button_upload_image.grid(row=0, pady=10, padx=30)
+# switch for include/eclude pen
+label = ctk.CTkLabel(master=left_frame, text="Pen Mode:")
+label.pack(pady=5)
+switch_var = ctk.StringVar(value="on")
+def switch_event():
+    if(switch_var.get() == "on"):
+        include()
+    else:
+        exclude()
+    print("switch toggled, current value:", switch_var.get())
 
-empty_space = tk.Frame(master=buttons_frame, height=40)
-empty_space.grid(row=1)
+mode_switch = ctk.CTkSwitch(master=left_frame, text="Include", state="disabled", command=switch_event,
+                                   variable=switch_var, onvalue="on", offvalue="off")
+mode_switch.pack(padx=20, pady=10)
 
-button_include = customtkinter.CTkButton(master=buttons_frame, corner_radius=10, text="Include Tool", command=actions.button_function)
-button_include.grid(row=2, pady=10, padx=30)
 
-button_avoid = customtkinter.CTkButton(master=buttons_frame, corner_radius=10, text="Avoid Tool", command=actions.button_function)
-button_avoid.grid(row=3, pady=10, padx=30)
+# Size slider
+margin = ctk.CTkFrame(master=left_frame, height=20)
 
-empty_space2 = tk.Frame(master=buttons_frame, height=60)
-empty_space2.grid(row=4)
+# Label for the slider
+label = ctk.CTkLabel(master=left_frame, text="Pen Size:")
+label.pack(pady=5)
 
-button_preview = customtkinter.CTkButton(master=buttons_frame, corner_radius=10, text="Preview Segmentation", command=actions.button_function)
-button_preview.grid(row=5, pady=10, padx=30)
+# slider
+pen_size_scale = ctk.CTkSlider(master=left_frame, from_=5, to=45,state="disabled", command=change_pen_size, width=120)
+pen_size_scale.set(pen_size)
+pen_size_scale.pack()
 
-# Right Frame holds the main image and the space for the user to higlight selected zones
-right_frame = customtkinter.CTkFrame(master=main_frame)
-right_frame.grid(row=0, column=1, sticky="nsew")
-main_frame.columnconfigure(1, weight=1)
-main_frame.rowconfigure(0, weight=1)
+# Clear canva button
+clear_button = ctk.CTkButton(left_frame, text="Clear Selection", state="disabled", command=clear_canvas)
+clear_button.pack(pady=10)
 
-image_frame = tk.Frame(master=right_frame, bg="white")
-image_frame.pack(fill=tk.BOTH, expand=True)
+# Process image button
+process_segmentation_button = ctk.CTkButton(left_frame, text="Process Segmentation", state="disabled", command=process_segmentation)
+process_segmentation_button.pack(pady=10, padx=20)
 
-root_tk.mainloop()
+canvas.bind("<Button-1>", start_draw)
+canvas.bind("<B1-Motion>", draw)
+canvas.bind("<ButtonRelease-1>", end_draw)
+
+root.mainloop()
