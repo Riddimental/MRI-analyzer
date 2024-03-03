@@ -2,7 +2,8 @@ import customtkinter as ctk
 import tkinter as tk
 import nibabel as nib
 import matplotlib.pyplot as plt
-from tkinter import filedialog
+import filters
+from tkinter import Toplevel, filedialog
 from PIL import Image, ImageTk
 
 root = ctk.CTk()
@@ -20,10 +21,30 @@ root.title("MRI Segmentation Tool")
 pen_color = ""
 pen_size = 15
 file_path = ""
+nii_data = []
+nii_data_backup = []
 
+def plot_image():
+    global file_path, pen_color
+    # placing plot in the canvas
+    plot_image = Image.open("output/plot.png")
+    width, height = int(plot_image.width * 3), int(plot_image.height * 3) # upscaling the plot_image
+    plot_image = plot_image.resize((width, height))
+    
+    # adjusting the canvas to be the same size
+    drawing_canvas.config(width=plot_image.width, height=plot_image.height)
+    
+    image = ImageTk.PhotoImage(plot_image)
+    drawing_canvas.image = image
+    drawing_canvas.create_image(0, 0, image=image, anchor="nw")
+    mode_switch.configure(state="normal")
+    pen_size_scale.configure(state="normal")
+    clear_button.configure(state="normal")
+    process_segmentation_button.configure(state="normal")
+    pen_color="green3"
 
 def add_image():
-    global file_path, pen_color
+    global file_path, pen_color, nii_data, nii_data_backup
     file_path = filedialog.askopenfilename(filetypes=[("NIfTI files", "*.nii")])
     if file_path:
         try:
@@ -33,6 +54,7 @@ def add_image():
             
             # getting data
             nii_data = nii_file[:,:,100]
+            nii_data_backup = nii_data
             
             # plotting data
             plt.imshow(nii_data)
@@ -41,22 +63,8 @@ def add_image():
                        , cmap='gray'
                        )
             
-            # placing plot in the canvas
-            plot_image = Image.open("output/plot.png")
-            width, height = int(plot_image.width * 3), int(plot_image.height * 3) # upscaling the plot_image
-            plot_image = plot_image.resize((width, height))
-            
-            # adjusting the canvas to be the same size
-            drawing_canvas.config(width=plot_image.width, height=plot_image.height)
-            
-            image = ImageTk.PhotoImage(plot_image)
-            drawing_canvas.image = image
-            drawing_canvas.create_image(0, 0, image=image, anchor="nw")
-            mode_switch.configure(state="normal")
-            pen_size_scale.configure(state="normal")
-            clear_button.configure(state="normal")
-            process_segmentation_button.configure(state="normal")
-            pen_color="green3"
+            # runs function to update background
+            plot_image()
         except Exception as e:
             print("Error loading image:", e)
     else:
@@ -94,11 +102,58 @@ def clear_canvas():
     pen_size = 15
     pen_size_scale.set(15)
     pen_color = "green3"
-    mode_switch.select()
+    mode_switch.select()     
 
-def process_segmentation():
-    print("Work in progress jeje")
+def filters_window():
     
+    global nii_data
+    
+    # Toplevel object which will 
+    # be treated as a new window
+    filters_window = Toplevel(root)
+    
+    options = []
+    
+    # deactivate the filters button while this windows is open to avoid repeated instances
+    process_segmentation_button.configure(state="disabled")
+    
+    # sets the title of the
+    # Toplevel widget
+    filters_window.title("Image Filters Selector")
+ 
+    # sets the geometry of toplevel
+    filters_window.geometry("400x600")
+
+    # spacer
+    ctk.CTkFrame(master=filters_window, height=40).pack()
+    
+    # options in radiobuttons
+    var = tk.IntVar()
+    
+    # Gaussian option
+    gaussian_filter_radio = ctk.CTkRadioButton(master=filters_window, text="Gaussian smoothing", variable=var, value=1, command=lambda: [filters.gaussian(nii_data)])
+    gaussian_filter_radio.pack()
+    
+    # Laplacian filter (edges)
+    laplacian_filter_radio = ctk.CTkRadioButton(master=filters_window, text="Laplacian edges", variable=var, value=2, command= filters.laplacian(nii_data))
+    laplacian_filter_radio.pack()
+    
+    # An apply button to confirm changes
+    ctk.CTkButton(master=filters_window, text ="Apply", command=lambda: [filters_window.destroy(),apply_changes(options)]).pack()
+    print("ventana filtros")
+    
+    # A cancel button to discard changes
+    ctk.CTkButton(master=filters_window, text ="Cancel", command=lambda: [filters_window.destroy(),process_segmentation_button.configure(state="normal")]).pack()
+    print("ventana filtros")
+    
+def apply_changes(options):
+    # run update image function
+    plot_image()
+    
+    # activate the filters button
+    process_segmentation_button.configure(state="normal")
+    print("boton apply")
+
 def switch_event():
     if(switch_var.get() == "on"):
         include()
@@ -162,7 +217,7 @@ clear_button = ctk.CTkButton(left_frame, text="Clear Selection", state="disabled
 clear_button.pack(pady=10)
 
 # Process image button
-process_segmentation_button = ctk.CTkButton(left_frame, text="Process Segmentation", state="disabled", command=process_segmentation)
+process_segmentation_button = ctk.CTkButton(left_frame, text="Filters", state="disabled", command=filters_window)
 process_segmentation_button.pack(pady=10, padx=20)
 
 drawing_canvas.bind("<Button-1>", start_draw)
