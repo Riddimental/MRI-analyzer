@@ -3,21 +3,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 import cv2
 
-def gaussian(data):
-   data = cv2.GaussianBlur(data,(13,13),0)
+def gaussian(data, intensity):
+   data = cv2.GaussianBlur(data,(intensity,intensity),0)
    # plotting data
-   plt.imshow(data)
+   plt.imshow(data, cmap="gray")
    plt.axis('off')
-   plt.imsave("output/plot.png", data
-               , cmap='gray'
-               )
+   plt.savefig("output/plot.png", format='png', dpi= 120)
    print("gaussian applied")
    
 def laplacian(data):
    data = cv2.Laplacian(data, -1, ksize=5, scale=1,delta=0, borderType=cv2.BORDER_DEFAULT)
-   plt.imshow(data)
+   plt.imshow(data, cmap="gray")
    plt.axis('off')
-   plt.imsave("output/plot.png", data
-               , cmap='gray'
-               )
+   plt.savefig("output/plot.png", format='png', dpi= 120)
    print("laplacian applied")

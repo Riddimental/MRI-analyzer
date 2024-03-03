@@ -10,7 +10,7 @@ root = ctk.CTk()
 
 # Window dimensions and centering
 window_width = 1000
-window_height = 600
+window_height = 700
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
 x = (screen_width - window_width) // 2
@@ -20,16 +20,16 @@ root.title("MRI Segmentation Tool")
 
 pen_color = ""
 pen_size = 15
+gaussian_intensity = 1
 file_path = ""
 nii_data = []
 nii_data_backup = []
 
-def plot_image():
-    global file_path, pen_color
+def refresh_image():
     # placing plot in the canvas
     plot_image = Image.open("output/plot.png")
-    width, height = int(plot_image.width * 3), int(plot_image.height * 3) # upscaling the plot_image
-    plot_image = plot_image.resize((width, height))
+    #width, height = int(plot_image.width * 3), int(plot_image.height * 3) # upscaling the plot_image
+    #plot_image = plot_image.resize((width, height))
     
     # adjusting the canvas to be the same size
     drawing_canvas.config(width=plot_image.width, height=plot_image.height)
@@ -37,10 +37,25 @@ def plot_image():
     image = ImageTk.PhotoImage(plot_image)
     drawing_canvas.image = image
     drawing_canvas.create_image(0, 0, image=image, anchor="nw")
+
+def plot_image(data):
+    global pen_color
+    
+    # plotting data
+    plt.figure(facecolor='black')
+    plt.imshow(data, cmap='gray')
+    plt.axis('off')
+    plt.savefig("output/plot.png", format='png', dpi= 120)
+    
+    refresh_image()
+    
     mode_switch.configure(state="normal")
     pen_size_scale.configure(state="normal")
     clear_button.configure(state="normal")
     process_segmentation_button.configure(state="normal")
+    gaussian_filter_button.configure(state="normal")
+    restore_image_button.configure(state="normal")
+    gaussian_slider.configure(state="normal")
     pen_color="green3"
 
 def add_image():
@@ -53,18 +68,11 @@ def add_image():
             nii_file.shape
             
             # getting data
-            nii_data = nii_file[:,:,100]
+            nii_data = nii_file[:,:,109]
             nii_data_backup = nii_data
             
-            # plotting data
-            plt.imshow(nii_data)
-            plt.axis('off')
-            plt.imsave("output/plot.png", nii_data
-                       , cmap='gray'
-                       )
-            
             # runs function to update background
-            plot_image()
+            plot_image(nii_data)
         except Exception as e:
             print("Error loading image:", e)
     else:
@@ -73,6 +81,10 @@ def add_image():
 def change_pen_size(val):
     global pen_size
     pen_size = int(val)
+    
+def change_gaussian_val(val):
+    global gaussian_intensity
+    gaussian_intensity = int(val)
     
 def include():
     global pen_color
@@ -131,7 +143,7 @@ def filters_window():
     var = tk.IntVar()
     
     # Gaussian option
-    gaussian_filter_radio = ctk.CTkRadioButton(master=filters_window, text="Gaussian smoothing", variable=var, value=1, command=lambda: [filters.gaussian(nii_data)])
+    gaussian_filter_radio = ctk.CTkRadioButton(master=filters_window, text="Gaussian smoothing", variable=var, value=1, command=lambda: [filters.gaussian(nii_data,gaussian_intensity)])
     gaussian_filter_radio.pack()
     
     # Laplacian filter (edges)
@@ -146,9 +158,15 @@ def filters_window():
     ctk.CTkButton(master=filters_window, text ="Cancel", command=lambda: [filters_window.destroy(),process_segmentation_button.configure(state="normal")]).pack()
     print("ventana filtros")
     
+def restore_data():
+    global nii_data, nii_data_backup
+    nii_data = nii_data_backup
+    plot_image(nii_data_backup)
+    
+
 def apply_changes(options):
     # run update image function
-    plot_image()
+    plot_image(nii_data)
     
     # activate the filters button
     process_segmentation_button.configure(state="normal")
@@ -215,6 +233,26 @@ pen_size_scale.pack()
 # Clear canva button
 clear_button = ctk.CTkButton(left_frame, text="Clear Selection", state="disabled", command=clear_canvas)
 clear_button.pack(pady=10)
+
+# Gaussian slider
+margin = ctk.CTkFrame(master=left_frame, height=20)
+
+# Label for the Gaussian slider
+label_Gaussian = ctk.CTkLabel(master=left_frame, text="Gaussian intensity:")
+label_Gaussian.pack(pady=5)
+
+# slider
+gaussian_slider = ctk.CTkSlider(master=left_frame, from_=1, to=13, state="disabled", command=change_gaussian_val, width=120)
+gaussian_slider.set(1)
+gaussian_slider.pack(pady=5)
+
+# Gaussian filter Button
+gaussian_filter_button = ctk.CTkButton(left_frame, text="Gaussian Filter", state="disabled", command=lambda: [filters.gaussian(nii_data,gaussian_intensity),refresh_image()])
+gaussian_filter_button.pack(pady=5)
+
+# restore image Button
+restore_image_button = ctk.CTkButton(left_frame, text="Restore Image", state="disabled",  command=lambda: [restore_data(),plot_image(nii_data)])
+restore_image_button.pack(pady=5)
 
 # Process image button
 process_segmentation_button = ctk.CTkButton(left_frame, text="Filters", state="disabled", command=filters_window)
