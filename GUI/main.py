@@ -1,6 +1,7 @@
 import customtkinter as ctk
 import tkinter as tk
 import nibabel as nib
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import filters
 from tkinter import Toplevel, filedialog
@@ -10,7 +11,7 @@ root = ctk.CTk()
 
 # Window dimensions and centering
 window_width = 1000
-window_height = 700
+window_height = 600
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
 x = (screen_width - window_width) // 2
@@ -41,11 +42,15 @@ def refresh_image():
 def plot_image(data):
     global pen_color
     
+    #mpl.rcParams['savefig.pad_inches'] = 0
+    
     # plotting data
-    plt.figure(facecolor='black')
+    plt.axes(frameon=False)
+    #plt.figure(facecolor='black')
     plt.imshow(data, cmap='gray')
     plt.axis('off')
-    plt.savefig("output/plot.png", format='png', dpi= 120)
+    plt.autoscale(tight=True)
+    plt.savefig("output/plot.png", format='png', dpi= 120, bbox_inches='tight', pad_inches=0)
     
     refresh_image()
     
@@ -53,9 +58,6 @@ def plot_image(data):
     pen_size_scale.configure(state="normal")
     clear_button.configure(state="normal")
     process_segmentation_button.configure(state="normal")
-    gaussian_filter_button.configure(state="normal")
-    restore_image_button.configure(state="normal")
-    gaussian_slider.configure(state="normal")
     pen_color="green3"
 
 def add_image():
@@ -86,6 +88,12 @@ def change_gaussian_val(val):
     global gaussian_intensity
     gaussian_intensity = int(val)
     
+def switch_event():
+    if(switch_var.get() == "on"):
+        include()
+    else:
+        exclude()
+
 def include():
     global pen_color
     pen_color = "green3"
@@ -137,56 +145,76 @@ def filters_window():
     filters_window.geometry("400x600")
 
     # spacer
-    ctk.CTkFrame(master=filters_window, height=40).pack()
+    ctk.CTkLabel(master=filters_window,text="Filtering Options", height=40).pack(pady=15)
     
-    # options in radiobuttons
-    var = tk.IntVar()
+    # frame grid for filters
+    filters_frame = tk.Frame(master=filters_window)
+    filters_frame.pack()
     
-    # Gaussian option
-    gaussian_filter_radio = ctk.CTkRadioButton(master=filters_window, text="Gaussian smoothing", variable=var, value=1, command=lambda: [filters.gaussian(nii_data,gaussian_intensity)])
-    gaussian_filter_radio.pack()
+    # Gaussian frame
+    gaussian_frame = tk.Frame(master=filters_frame)
+    gaussian_frame.grid(row=0, column=0, padx=15, pady=5)
+    #gaussian_frame.pack()
     
-    # Laplacian filter (edges)
-    laplacian_filter_radio = ctk.CTkRadioButton(master=filters_window, text="Laplacian edges", variable=var, value=2, command= filters.laplacian(nii_data))
-    laplacian_filter_radio.pack()
+    # Gaussian slider
+    gaussian_label = ctk.CTkLabel(master=gaussian_frame, text="Gaussian Options", height=10)
+    gaussian_label.pack(pady=15)
+
+    # Label for the Gaussian slider
+    label_Gaussian = ctk.CTkLabel(master=gaussian_frame, text="Gaussian intensity:")
+    label_Gaussian.pack()
+
+    # slider
+    gaussian_slider = ctk.CTkSlider(master=gaussian_frame, from_=1, to=13, command=change_gaussian_val, width=120)
+    gaussian_slider.set(1)
+    gaussian_slider.pack(pady=5)
+
+    # Gaussian filter Button
+    gaussian_filter_button = ctk.CTkButton(master=gaussian_frame, text="Gaussian Filter", command=lambda: [filters.gaussian(nii_data,gaussian_intensity),refresh_image()])
+    gaussian_filter_button.pack(pady=5)
+    
+    # Laplacian frame
+    laplacian_frame = tk.Frame(master=filters_frame)
+    laplacian_frame.grid(row=0, column=1, padx=15, pady=5)
+    #laplacian_frame.pack()
+    
+    # Gaussian slider
+    laplacian_label = ctk.CTkLabel(master=laplacian_frame, text="Laplacian Options", height=10)
+    laplacian_label.pack(pady=15)
+
+    # Laplacian filter button (edge detection)
+    laplacian_filter_button = ctk.CTkButton(master=laplacian_frame, text="Laplacian edges", command= lambda: [filters.laplacian(nii_data),refresh_image()])
+    laplacian_filter_button.pack(pady=5)
+    
+    buttons_frame = tk.Frame(master=filters_window)
+    buttons_frame.pack(pady=30)
     
     # An apply button to confirm changes
-    ctk.CTkButton(master=filters_window, text ="Apply", command=lambda: [filters_window.destroy(),apply_changes(options)]).pack()
-    print("ventana filtros")
+    apply_button = ctk.CTkButton(master=buttons_frame, text ="Apply", command=lambda: [filters_window.destroy()])
+    apply_button.grid(row=0, column=0, padx=5, pady=5)
+    
+    # restore image Button
+    restore_image_button = ctk.CTkButton(master=buttons_frame, text="Restore Image",  command=lambda: [restore_data(),plot_image(nii_data)])
+    restore_image_button.grid(row=0, column=0, padx=5, pady=5)
     
     # A cancel button to discard changes
-    ctk.CTkButton(master=filters_window, text ="Cancel", command=lambda: [filters_window.destroy(),process_segmentation_button.configure(state="normal")]).pack()
-    print("ventana filtros")
+    close_button = ctk.CTkButton(master=buttons_frame, text ="Close", command=lambda: [filters_window.destroy(),process_segmentation_button.configure(state="normal")])
+    close_button.grid(row=0, column=1, padx=5, pady=5)
     
 def restore_data():
     global nii_data, nii_data_backup
     nii_data = nii_data_backup
     plot_image(nii_data_backup)
-    
 
-def apply_changes(options):
-    # run update image function
-    plot_image(nii_data)
-    
-    # activate the filters button
-    process_segmentation_button.configure(state="normal")
-    print("boton apply")
-
-def switch_event():
-    if(switch_var.get() == "on"):
-        include()
-    else:
-        exclude()
-    print("switch toggled, current value:", switch_var.get())
 
 
 # left Frame which contains the tools and options
 left_frame = ctk.CTkFrame(root, height=600)
-left_frame.pack(padx= 15, side='left', fill='y')
+left_frame.pack(side='left', fill='y')
 
 # Canvas Area on the rest of the window
 canvas_frame = ctk.CTkFrame(root, width=750, height=600)
-canvas_frame.pack()
+canvas_frame.pack(pady=50, padx=15)
 drawing_canvas = ctk.CTkCanvas(canvas_frame, width=750, height=600)
 drawing_canvas.pack()
 
@@ -205,7 +233,7 @@ title_label.grid(row=1)
 
 # Upload Button
 upload_button = ctk.CTkButton(left_frame, text='Upload Image', command=add_image)
-upload_button.pack(pady=15)
+upload_button.pack(pady=15, padx=20)
 
 # switch for include/eclude pen
 label = ctk.CTkLabel(master=left_frame, text="Pen Mode:")
@@ -233,26 +261,6 @@ pen_size_scale.pack()
 # Clear canva button
 clear_button = ctk.CTkButton(left_frame, text="Clear Selection", state="disabled", command=clear_canvas)
 clear_button.pack(pady=10)
-
-# Gaussian slider
-margin = ctk.CTkFrame(master=left_frame, height=20)
-
-# Label for the Gaussian slider
-label_Gaussian = ctk.CTkLabel(master=left_frame, text="Gaussian intensity:")
-label_Gaussian.pack(pady=5)
-
-# slider
-gaussian_slider = ctk.CTkSlider(master=left_frame, from_=1, to=13, state="disabled", command=change_gaussian_val, width=120)
-gaussian_slider.set(1)
-gaussian_slider.pack(pady=5)
-
-# Gaussian filter Button
-gaussian_filter_button = ctk.CTkButton(left_frame, text="Gaussian Filter", state="disabled", command=lambda: [filters.gaussian(nii_data,gaussian_intensity),refresh_image()])
-gaussian_filter_button.pack(pady=5)
-
-# restore image Button
-restore_image_button = ctk.CTkButton(left_frame, text="Restore Image", state="disabled",  command=lambda: [restore_data(),plot_image(nii_data)])
-restore_image_button.pack(pady=5)
 
 # Process image button
 process_segmentation_button = ctk.CTkButton(left_frame, text="Filters", state="disabled", command=filters_window)
