@@ -1,5 +1,7 @@
 import customtkinter as ctk
 import tkinter as tk
+import nibabel as nib
+import matplotlib.pyplot as plt
 from tkinter import filedialog
 from PIL import Image, ImageTk
 
@@ -16,22 +18,40 @@ root.geometry(f"{window_width}x{window_height}+{x}+{y}")
 root.title("MRI Segmentation Tool")
 
 pen_color = ""
-pen_size = 25
+pen_size = 15
 file_path = ""
 
 
 def add_image():
     global file_path, pen_color
-    file_path = filedialog.askopenfilename()
+    file_path = filedialog.askopenfilename(filetypes=[("NIfTI files", "*.nii")])
     if file_path:
         try:
-            image = Image.open(file_path)
-            width, height = int(image.width / 2), int(image.height / 2)
-            image = image.resize((width, height))
-            canvas.config(width=image.width, height=image.height)
-            image = ImageTk.PhotoImage(image)
-            canvas.image = image
-            canvas.create_image(0, 0, image=image, anchor="nw")
+            # reading file
+            nii_file = nib.load(file_path).get_fdata()
+            nii_file.shape
+            
+            # getting data
+            nii_data = nii_file[:,:,100]
+            
+            # plotting data
+            plt.imshow(nii_data)
+            plt.axis('off')
+            plt.imsave("output/plot.png", nii_data
+                       , cmap='gray'
+                       )
+            
+            # placing plot in the canvas
+            plot_image = Image.open("output/plot.png")
+            width, height = int(plot_image.width * 3), int(plot_image.height * 3) # upscaling the plot_image
+            plot_image = plot_image.resize((width, height))
+            
+            # adjusting the canvas to be the same size
+            drawing_canvas.config(width=plot_image.width, height=plot_image.height)
+            
+            image = ImageTk.PhotoImage(plot_image)
+            drawing_canvas.image = image
+            drawing_canvas.create_image(0, 0, image=image, anchor="nw")
             mode_switch.configure(state="normal")
             pen_size_scale.configure(state="normal")
             clear_button.configure(state="normal")
@@ -57,7 +77,7 @@ def exclude():
 def draw(event):
     global last_x, last_y
     x, y = event.x, event.y
-    canvas.create_line(last_x, last_y, x, y, fill=pen_color, width=pen_size*2, capstyle="round", smooth=True)
+    drawing_canvas.create_line(last_x, last_y, x, y, fill=pen_color, width=pen_size*2, capstyle="round", smooth=True)
     last_x, last_y = x, y
 
 def start_draw(event):
@@ -69,23 +89,33 @@ def end_draw(event):
  
 def clear_canvas():
     global pen_size, pen_color
-    canvas.delete("all")
-    canvas.create_image(0, 0, image=canvas.image, anchor="nw")
-    pen_size = 25
-    pen_size_scale.set(25)
-    #pen_color = ""
+    drawing_canvas.delete("all")
+    drawing_canvas.create_image(0, 0, image=drawing_canvas.image, anchor="nw")
+    pen_size = 15
+    pen_size_scale.set(15)
+    pen_color = "green3"
     mode_switch.select()
 
 def process_segmentation():
     print("Work in progress jeje")
     
+def switch_event():
+    if(switch_var.get() == "on"):
+        include()
+    else:
+        exclude()
+    print("switch toggled, current value:", switch_var.get())
+
+
 # left Frame which contains the tools and options
 left_frame = ctk.CTkFrame(root, height=600)
 left_frame.pack(padx= 15, side='left', fill='y')
 
 # Canvas Area on the rest of the window
-canvas = ctk.CTkCanvas(root, width=750, height=600)
-canvas.pack()
+canvas_frame = ctk.CTkFrame(root, width=750, height=600)
+canvas_frame.pack()
+drawing_canvas = ctk.CTkCanvas(canvas_frame, width=750, height=600)
+drawing_canvas.pack()
 
 # Logo
 logo_frame = ctk.CTkFrame(master=left_frame)
@@ -108,12 +138,7 @@ upload_button.pack(pady=15)
 label = ctk.CTkLabel(master=left_frame, text="Pen Mode:")
 label.pack(pady=5)
 switch_var = ctk.StringVar(value="on")
-def switch_event():
-    if(switch_var.get() == "on"):
-        include()
-    else:
-        exclude()
-    print("switch toggled, current value:", switch_var.get())
+
 
 mode_switch = ctk.CTkSwitch(master=left_frame, text="Include", state="disabled", command=switch_event,
                                    variable=switch_var, onvalue="on", offvalue="off")
@@ -128,7 +153,7 @@ label = ctk.CTkLabel(master=left_frame, text="Pen Size:")
 label.pack(pady=5)
 
 # slider
-pen_size_scale = ctk.CTkSlider(master=left_frame, from_=5, to=45,state="disabled", command=change_pen_size, width=120)
+pen_size_scale = ctk.CTkSlider(master=left_frame, from_=5, to=25,state="disabled", command=change_pen_size, width=120)
 pen_size_scale.set(pen_size)
 pen_size_scale.pack()
 
@@ -140,8 +165,8 @@ clear_button.pack(pady=10)
 process_segmentation_button = ctk.CTkButton(left_frame, text="Process Segmentation", state="disabled", command=process_segmentation)
 process_segmentation_button.pack(pady=10, padx=20)
 
-canvas.bind("<Button-1>", start_draw)
-canvas.bind("<B1-Motion>", draw)
-canvas.bind("<ButtonRelease-1>", end_draw)
+drawing_canvas.bind("<Button-1>", start_draw)
+drawing_canvas.bind("<B1-Motion>", draw)
+drawing_canvas.bind("<ButtonRelease-1>", end_draw)
 
 root.mainloop()
