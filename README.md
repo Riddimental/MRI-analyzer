@@ -67,6 +67,7 @@ The interface offers various options, including different filters and visualizat
 ![Main interface](screenshots/sagital.png)
 
 ![Main interface](screenshots/interface.gif)
+![Image Slices](screenshots/slices.gif)
 
 To apply segmentation, first utilize the pencil tool to highlight the region of interest (marked in green) and the areas to avoid (marked in red):
 
