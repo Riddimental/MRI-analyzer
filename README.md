@@ -47,9 +47,25 @@ Upon running the script, a GUI window will open. Follow the instructions on the 
 
 ## Screenshots
 
-the first window looks like this:
+when you open the app, the first window should look like this:
 
 ![First window](screenshots/start.png)
+
+select the MRI image in .nii format like so:
+
+![File selection](screenshots/load_image.png)
+
+now the first print of your file should appear along with the tools and options for you to tweak it
+
+![Main interface](screenshots/interface.png)
+
+you have many options, segmenting a visualizing options, along with a slider to see each and every slice of your 3d image
+
+![File selection](screenshots/coronal.png)
+
+![File selection](screenshots/axial.png)
+
+
 
 ## Dependencies
 
