@@ -1,4 +1,4 @@
-# MRI analyzer
+# MRI Analyzer
  MRI scans segmentation tool(beta)
 
 
@@ -45,7 +45,7 @@ Upon running the script, a GUI window will open. Follow the instructions on the 
 - Clear selections.
 - Process segmentation.
 
-## Screenshots
+## Walkthrough Images
 
 Upon opening the app, the initial window should resemble the following:
 
@@ -76,8 +76,8 @@ To apply segmentation, first utilize the pencil tool to highlight the region of 
 
 Once the selection is made, click the "Apply Region Growing" button to initiate the Region Growing segmentation process:
 
-![Main interface](screenshots/selection2.gif)
 ![Main interface](screenshots/segmented_axial.png)
+![Main interface](screenshots/selection2.gif)
 
 You can apply additional filters before segmentation; feel free to experiment with the filter parameters in the filters window:
 
@@ -89,8 +89,14 @@ You can apply additional filters before segmentation; feel free to experiment wi
 ## Dependencies
 
 - `customtkinter`: A custom module for enhanced GUI elements.
-- `tkinter`: Standard Python interface to the Tk GUI toolkit.
-- `PIL`: Python Imaging Library to work with images.
+- `tkinter`: Standard Python interface to the Tk GUI toolkit (usually comes pre-installed with Python).
+- `PIL`: Python Imaging Library to work with images (usually comes pre-installed with Python).
+- `Python`: Python version 3.6 or higher.
+- `numpy`: A powerful library for numerical computing.
+- `nibabel`: A library for reading and writing neuroimaging data in various formats.
+- `matplotlib`: A plotting library for creating static, animated, and interactive visualizations in Python.
+- `filters`: A module for image processing filters and operations.
+
 
 ## Contributing
 
