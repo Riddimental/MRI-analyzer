@@ -45,6 +45,12 @@ Upon running the script, a GUI window will open. Follow the instructions on the 
 - Clear selections.
 - Process segmentation.
 
+## Screenshots
+
+the first window looks like this:
+
+![First window]("screenshots/start.png")
+
 ## Dependencies
 
 - `customtkinter`: A custom module for enhanced GUI elements.
