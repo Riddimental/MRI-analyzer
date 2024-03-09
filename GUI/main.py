@@ -577,10 +577,10 @@ title_label.pack(padx=10)
 view_dropdown = ctk.CTkComboBox(master=view_frame, variable=view_mode, values=view_options, command=handle_dropdown_selection, state="disabled")
 view_dropdown.pack(padx=10)
 
-
 # slice frame
 slice_frame = tk.Frame(canva_tools_frame)
 slice_frame.grid(row=0,column=2,pady=5)
+
 # Label for the slider
 text_val = "Slice: " + str(slice_portion)
 label_slice = ctk.CTkLabel(master=slice_frame, text=text_val)
@@ -612,28 +612,23 @@ upload_button.grid(row=2,pady=10, padx=20)
 
 # switch for include/eclude pen
 label_pen_mode = ctk.CTkLabel(master=left_frame_canvas, text="Pen Mode:")
-#label_pen_mode.grid(row=7,pady=5)
 switch_var = ctk.StringVar(value="on")
 
 mode_switch = ctk.CTkSwitch(master=left_frame_canvas, text="Include", state="disabled", command=switch_event, variable=switch_var, onvalue="on", offvalue="off")
-#mode_switch.grid(row=8, pady=5)
 
 # Pen size slider
 # Label for the slider
 text_val = "Pen Size: " + str(pen_size)
 label_pen_size = ctk.CTkLabel(master=left_frame_canvas, text=text_val)
-#label_pen_size.grid(row=9,pady=5)
 
 # slider
 pen_size_scale = ctk.CTkSlider(master=left_frame_canvas, from_=1, to=13,state="disabled", command=change_pen_size, width=120)
 pen_size_scale.set(pen_size)
-#pen_size_scale.grid(row=10)
 
 
 
 # Frame for segmentation tools
 segmentation_tools_frame = tk.Frame(master=left_frame_canvas)
-#segmentation_tools_frame.grid(row=13,pady=10,padx=20)
 
 # Label for the tolerance slider
 text_val = "Tolerance: " + str(tolerance_value)
@@ -651,11 +646,9 @@ segmentation_button.pack(pady=10)
 
 # Clear canva button
 restore_button = ctk.CTkButton(left_frame_canvas, text="Restore Original", command=restore_original)
-#segmentation_tools_frame.grid(row=14,pady=10,padx=20)
 
 # Process image segmentation button
 undo_button = ctk.CTkButton(left_frame_canvas, text="Undo", command=undoIt)
-#segmentation_tools_frame.grid(row=15,pady=10,padx=20)
 
 picture_canvas.bind("<Button-1>", start_draw)
 picture_canvas.bind("<B1-Motion>", draw)
