@@ -1,4 +1,5 @@
 import time
+import os
 import customtkinter as ctk
 import numpy as np
 import tkinter as tk
@@ -104,12 +105,25 @@ def plot_image():
     view_dropdown.configure(state="normal")
     segmentation_button.configure(state="normal")
     Tolerance_slider.configure(state="normal")
+    filters_button.configure(state="normal")
     label_pen_mode.grid(row=7,pady=5)
     mode_switch.grid(row=8, pady=5)
     label_pen_size.grid(row=9,pady=5)
     pen_size_scale.grid(row=10)
     segmentation_tools_frame.grid(row=13,pady=10,padx=20)
+    restore_button.grid(row=14,pady=10,padx=20)
+    undo_button.grid(row=15,pady=10,padx=20)
     pen_color="#00cd00"
+    
+def undoIt():
+    try:
+        os.rename("temp/undo.png", "temp/plot.png")
+        refresh_image()
+        print("undone")
+    except FileNotFoundError:
+        print("No undo steps")
+    except Exception as e:
+        print("An error occurred:", e)
 
 def add_image():
     global file_path, pen_color, nii_2d_image, nii_3dimage_backup, nii_3d_image
@@ -127,7 +141,7 @@ def add_image():
             
             # runs function to update background
             plot_image()
-            clear_canvas()
+            restore_original()
             
         except Exception as e:
             print("Error loading image:", e)
@@ -171,21 +185,22 @@ def exclude():
 def draw(event):
     global last_x, last_y
     x, y = event.x, event.y
-    #drawing_canvas.create_line(last_x, last_y, x, y, fill=pen_color, width=pen_size*2, capstyle="round", smooth=True)
     picture_canvas.create_line(last_x, last_y, x, y, fill=pen_color, width=pen_size*2, capstyle="round", smooth=True)
     
-    # Save canvas image
-    draw_selection = Image.open("temp/selection_canvas.png")
+    # Check if selection_canvas exists
+    try:
+        draw_selection = Image.open("temp/selection_canvas.png")
+    except FileNotFoundError:
+        # Create a new image if selection_canvas doesn't exist
+        reference = Image.open('temp/plot.png')
+        draw_selection = Image.new("RGB", (reference.width, reference.height), (0,0,0))
+
     
     # Draw on the canvas image
     draw = ImageDraw.Draw(draw_selection)
     draw.line((last_x, last_y, x, y), fill=pen_color, width=pen_size*2)
     drawing_canvas.create_line(last_x, last_y, x, y, fill=pen_color, width=pen_size*2, capstyle="round", smooth=True)
     draw_selection.save("temp/selection_canvas.png", format='png')
-    
-    #draw = ImageDraw.Draw(draw_selection)
-    #draw.line((last_x, last_y, x, y), fill=pen_color, width=pen_size*2, joint='curve')
-    #draw_selection.save("temp/selection_canvas.png",format='png')
     
     last_x, last_y = x, y
 
@@ -197,13 +212,20 @@ def end_draw(event):
     #referencia.save()
     pass
  
-def clear_canvas():
-    global pen_size, pen_color
-    drawing_canvas.delete("all")
+def restore_original():
+    global pen_color
     picture_canvas.create_image(0, 0, image=picture_canvas.image, anchor="nw")
     plot_original = Image.open("temp/original.png")
     plot_original.save("temp/plot.png", format='png')
+    selection_image = Image.new("RGB",(plot_original.width,plot_original.height),(0,0,0))
+    pen_color = "#00cd00"
+    mode_switch.select()
+    refresh_image()     
+
+def erase_selection():
+    global pen_size, pen_color
     plot_image = Image.open("temp/plot.png")
+    drawing_canvas.delete("all")
     selection_image = Image.new("RGB",(plot_image.width,plot_image.height),(0,0,0))
     selection_image.save("temp/selection_canvas.png",format='png')
     selection_image.save("temp/green_mask.png",format='png')
@@ -391,7 +413,7 @@ def filters_window():
     threshold_slider.pack(pady=5)
     
     buttons_frame = tk.Frame(master=filters_window)
-    buttons_frame.pack(pady=30)
+    buttons_frame.pack(pady=15)
     
     
     # Isodata frame
@@ -424,20 +446,33 @@ def filters_window():
     isodata_tolerance_slider.pack(pady=5)
     
     # An apply button for isodata iterations
-    isodata_apply_button = ctk.CTkButton(master=isodata_frame, text ="Apply Isodata", command=apply_isodata)
+    isodata_apply_button = ctk.CTkButton(master=isodata_frame, text ="Preview Isodata", command=apply_isodata)
     isodata_apply_button.pack(pady=5)
     
-    # restore image Button
-    restore_image_button = ctk.CTkButton(master=buttons_frame, text="Restore Image",  command=lambda: [restore_data(),restore_sliders()])
-    restore_image_button.grid(row=0, column=0, padx=5, pady=5)
+    # cancel Button
+    cancel_filter = ctk.CTkButton(master=buttons_frame, text="Cancel",  command=lambda: [plot_image(),restore_sliders(),filters_window.destroy(),filters_button.configure(state="normal")])
+    cancel_filter.grid(row=0, column=0, padx=5, pady=5)
     
-    # A cancel button to discard changes
-    close_button = ctk.CTkButton(master=buttons_frame, text ="Close", command=lambda: [filters_window.destroy(),filters_button.configure(state="normal")])
-    close_button.grid(row=0, column=1, padx=5, pady=5)
+    # apply filter Button
+    apply_filter_button = ctk.CTkButton(master=buttons_frame, text="Apply Filter",  command=lambda: [filters_window.destroy(),filters_button.configure(state="normal")])
+    apply_filter_button.grid(row=0, column=1, padx=5, pady=5)
+
+def step():
+    undo_image = Image.open("temp/plot.png")
+    undo_image_array = np.array(undo_image)
     
+    unfo_fig = plt.figure(facecolor='black')
+    undo_plot = unfo_fig.add_subplot(111)
+    undo_image = plt.imshow(undo_image_array, cmap='gray')
+    plt.xticks([])
+    plt.yticks([])
+    plt.savefig("temp/undo.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
+
 def apply_segmentation():
     selection_image = Image.open("temp/selection_canvas.png")
     selection_array = np.array(selection_image)
+    
+    step()
     
     red_mask = (selection_array[:,:,0] > 200)
     red_mask_fig = plt.figure(facecolor='black')
@@ -467,18 +502,13 @@ def apply_segmentation():
     time.sleep(0.0016)
     plt.savefig("temp/visited_mask.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
     
-    original_image = Image.open("temp/original.png").convert('L')
-    original_image_plot = np.array(original_image)
+    #original_image = Image.open("temp/original.png").convert('L')
+    ploted_image = Image.open("temp/plot.png").convert('L')
+    image_plot = np.array(ploted_image)
     
-    filters.regionGrowing(original_image_plot, tolerance_value)
+    filters.regionGrowing(image_plot, tolerance_value)
     refresh_image()
-    
-def restore_data():
-    global nii_2d_image, nii_3dimage_backup
-    nii_2d_image = nii_3dimage_backup
-    plot_image()
-
-
+        
 
 # left Frame which contains the tools and options
 left_frame = ctk.CTkFrame(root, height=screen_height)
@@ -522,7 +552,7 @@ tools_button_frame = tk.Frame(canva_tools_frame)
 tools_button_frame.grid(row=0,column=0,pady=5)
 
 # Clear canva button
-clear_button = ctk.CTkButton(tools_button_frame, text="Clear Canvas", state="disabled", command=clear_canvas)
+clear_button = ctk.CTkButton(tools_button_frame, text="Clear Canvas", state="disabled", command=erase_selection)
 clear_button.pack(pady=5)
 
 # Filters button
@@ -617,7 +647,15 @@ Tolerance_slider.pack(pady=5)
 
 # Process image segmentation button
 segmentation_button = ctk.CTkButton(segmentation_tools_frame, text="Apply Region Growing", state="disabled", command=apply_segmentation)
-segmentation_button.pack(pady=20)
+segmentation_button.pack(pady=10)
+
+# Clear canva button
+restore_button = ctk.CTkButton(left_frame_canvas, text="Restore Original", command=restore_original)
+#segmentation_tools_frame.grid(row=14,pady=10,padx=20)
+
+# Process image segmentation button
+undo_button = ctk.CTkButton(left_frame_canvas, text="Undo", command=undoIt)
+#segmentation_tools_frame.grid(row=15,pady=10,padx=20)
 
 picture_canvas.bind("<Button-1>", start_draw)
 picture_canvas.bind("<B1-Motion>", draw)
@@ -625,7 +663,3 @@ picture_canvas.bind("<ButtonRelease-1>", end_draw)
 
 
 root.mainloop()
-
-
-#mymask = growing(80,84,image_data,25.3,,1000000)
-#regionGrowing(x0,y0,Image,Tolerance,max_iter):

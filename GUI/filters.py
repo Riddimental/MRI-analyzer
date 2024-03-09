@@ -16,7 +16,6 @@ def gaussian(data, intensity):
    plt.yticks([])
    time.sleep(0.0016)
    plt.savefig("temp/plot.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
-   #print("gaussian applied")
    
 def thresholding(data, threshold):
    transformed_image = data > threshold
@@ -28,7 +27,6 @@ def thresholding(data, threshold):
    time.sleep(0.0016)
    transformed_image_plot.imshow(transformed_image, cmap='gray')
    plt.savefig("temp/plot.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
-   #print("threshold applied")
    
 def isodata(image_data, threshold_0=200, tolerance= 0.001):
    iteraciones = 0
@@ -52,7 +50,6 @@ def isodata(image_data, threshold_0=200, tolerance= 0.001):
       iteraciones = iteraciones + 1
 
       threshold = new_threshold
-      #print("nuevo threshold",new_threshold)
       
    
    # isodata image
@@ -68,56 +65,11 @@ def isodata(image_data, threshold_0=200, tolerance= 0.001):
    
 def laplacian(data,inksize,inscale,indelta):
    data = cv2.Laplacian(data, -1, ksize=inksize, scale=inscale, delta=indelta, borderType=cv2.BORDER_DEFAULT)
-   #data = cv2.Laplacian(data, -1, ksize=5, scale=1,delta=0, borderType=cv2.BORDER_DEFAULT)
    plt.imshow(data, cmap="gray")
    plt.xticks([])
    plt.yticks([])
    time.sleep(0.0016)
    plt.savefig("temp/plot.png", format='png', dpi= 120, bbox_inches='tight', pad_inches=0)
-   #print("laplacian applied")
-
-# Region Growing
-
-
-# Distance Function to calculate how similar two pixels are
-def distance(x0,y0,x1,y1,Imagen_data):
-   print(Imagen_data.shape)
-   return abs(Imagen_data[x1,y1] - Imagen_data[x0,y0])
-
-# obtain the 4 neighbours of a pixel considering the size of the image
-def N4(x0,y0,M,N):
-   neighborhood = []
-   # right border
-   if x0+1 < M: neighborhood.append((x0+1,y0))
-   # left border
-   if x0-1 > 0: neighborhood.append((x0-1,y0))
-   # lower border
-   if y0+1 < N: neighborhood.append((x0,y0+1))
-   # upper border
-   if y0-1 > 0: neighborhood.append((x0,y0-1))
-   return neighborhood
-
-# obtain the neighbours of a pixel considering the size of the image
-def N8(x0,y0,M,N):
-   neighborhood = []
-   # right border
-   if x0+1 < M: neighborhood.append((x0+1,y0))
-   # left border
-   if x0-1 > 0: neighborhood.append((x0-1,y0))
-   # lower border
-   if y0+1 < N: neighborhood.append((x0,y0+1))
-   # upper border
-   if y0-1 > 0: neighborhood.append((x0,y0-1))
-   # right upper corner
-   if x0+1 < M and y0-1 > 0: neighborhood.append((x0+1,y0-1))
-   # left upper corner
-   if x0-1 > 0 and y0-1 > 0: neighborhood.append((x0-1,y0-1))
-   # right lower corner
-   if x0+1 < M and y0+1 < N: neighborhood.append((x0+1,y0+1))
-   # left lower corner
-   if x0-1 > 0 and y0+1 < N: neighborhood.append((x0-1,y0+1))
-   #print("neigborhood size ",len(neighborhood), neighborhood)
-   return neighborhood
 
 def get_white_pixels(image):
     # Convert image to grayscale if it's not already
@@ -152,7 +104,7 @@ def regionGrowing(image, threshold):
 
    # Define 4-connectivity neighbors
    neighbors = [(1, 0), (-1, 0), (0, 1), (0, -1)
-               #,(-1,-1),(1,1),(-1,1),(1,-1) #it works the same with 8 or 4 neighbors, still dont know which one is more efficient
+               ,(-1,-1),(1,1),(-1,1),(1,-1) #it works the same with 8 or 4 neighbors, still dont know which one is more efficient
                ]
    # Load PNG image of selected region
    selected_image = Image.open("temp/green_mask.png")
