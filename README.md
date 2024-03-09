@@ -49,7 +49,7 @@ Upon running the script, a GUI window will open. Follow the instructions on the 
 
 the first window looks like this:
 
-![First window]("screenshots/start.png")
+![First window](screenshots/start.png)
 
 ## Dependencies
 
