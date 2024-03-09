@@ -47,33 +47,33 @@ Upon running the script, a GUI window will open. Follow the instructions on the 
 
 ## Screenshots
 
-when you open the app, the first window should look like this:
+Upon opening the app, the initial window should resemble the following:
 
 ![First window](screenshots/start.png)
 
-select the MRI image in .nii format like so:
+Next, select an MRI image in .nii format as shown:
 
 ![File selection](screenshots/load_image.png)
 
-now the first print of your file should appear along with the tools and options for you to tweak it
+Once the image loads, the interface will display the first slice of your file along with tools and options for customization:
 
 ![File selection](screenshots/coronal.png)
 
-you have many options, segmenting a visualizing options, along with a slider to see each and every slice of your 3d image
+The interface offers various options, including different filters and visualization tools, along with a slider to navigate through each slice of your 3D image:
 
 ![Main interface](screenshots/sagital.png)
 
 ![Main interface](screenshots/interface.png)
 
-for applying the segmentation, first we use the pencil tool to highlight the region of interest (green color), and the avoid region (red color)
+To apply segmentation, first utilize the pencil tool to highlight the region of interest (marked in green) and the areas to avoid (marked in red):
 
 ![File selection](screenshots/axial.png)
 
-after drawing your selection, hit the "apply segmentation" button to start the Region Growing segmentation:
+Once the selection is made, click the "Apply Region Growing" button to initiate the Region Growing segmentation process:
 
 ![Main interface](screenshots/segmented_axial.png)
 
-you can apply other filters before the segmentation, feel free to play with the parameters in the filters window!
+You can apply additional filters before segmentation; feel free to experiment with the filter parameters in the filters window:
 
 ![Main interface](screenshots/filters.png)
 
