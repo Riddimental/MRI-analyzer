@@ -76,8 +76,8 @@ To apply segmentation, first utilize the pencil tool to highlight the region of 
 
 Once the selection is made, click the "Apply Region Growing" button to initiate the Region Growing segmentation process:
 
-![Main interface](screenshots/selection2.gif)
 ![Main interface](screenshots/segmented_axial.png)
+![Main interface](screenshots/selection2.gif)
 
 You can apply additional filters before segmentation; feel free to experiment with the filter parameters in the filters window:
 
