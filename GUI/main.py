@@ -1,4 +1,5 @@
 import time
+import os
 import customtkinter as ctk
 import numpy as np
 import tkinter as tk
@@ -13,9 +14,10 @@ root = ctk.CTk()
 
 # Window dimensions and centering
 window_width = 800
-window_height = 800
+window_height = 600
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
+ctk.set_appearance_mode="dark"
 x = (screen_width - window_width) // 2
 y = (screen_height - window_height) // 2
 root.geometry(f"{window_width}x{window_height}+{x}+{y}")
@@ -65,13 +67,16 @@ def plot_image():
     global max_value, nii_2d_image, nii_3d_image, pen_color, slice_portion
     
     #mpl.rcParams['savefig.pad_inches'] = 0
-    
+    #print(slice_portion)
     # selecting a slice out of the 3d image
     if(view_mode.get() == "Axial"):
+        if slice_portion >= 191: slice_portion = 190
         nii_2d_image = nii_3d_image[:,:,slice_portion]
     elif(view_mode.get() == "Coronal"):
+        if slice_portion >= 191: slice_portion = 190
         nii_2d_image = nii_3d_image[:,slice_portion,:]
     elif(view_mode.get() == "Sagittal"):
+        if slice_portion >= 168: slice_portion = 167
         nii_2d_image = nii_3d_image[slice_portion,:,:]
         
     # to find the range of the threshold slider
@@ -95,11 +100,30 @@ def plot_image():
     mode_switch.configure(state="normal")
     pen_size_scale.configure(state="normal")
     clear_button.configure(state="normal")
-    filters_button.configure(state="normal")
+    #filters_button.configure(state="normal")
     slice_slider.configure(state="normal")
+    view_dropdown.configure(state="normal")
     segmentation_button.configure(state="normal")
     Tolerance_slider.configure(state="normal")
+    filters_button.configure(state="normal")
+    label_pen_mode.grid(row=7,pady=5)
+    mode_switch.grid(row=8, pady=5)
+    label_pen_size.grid(row=9,pady=5)
+    pen_size_scale.grid(row=10)
+    segmentation_tools_frame.grid(row=13,pady=10,padx=20)
+    restore_button.grid(row=14,pady=10,padx=20)
+    undo_button.grid(row=15,pady=10,padx=20)
     pen_color="#00cd00"
+    
+def undoIt():
+    try:
+        os.rename("temp/undo.png", "temp/plot.png")
+        refresh_image()
+        print("undone")
+    except FileNotFoundError:
+        print("No undo steps")
+    except Exception as e:
+        print("An error occurred:", e)
 
 def add_image():
     global file_path, pen_color, nii_2d_image, nii_3dimage_backup, nii_3d_image
@@ -117,7 +141,7 @@ def add_image():
             
             # runs function to update background
             plot_image()
-            clear_canvas()
+            restore_original()
             
         except Exception as e:
             print("Error loading image:", e)
@@ -127,55 +151,23 @@ def add_image():
 def change_pen_size(val):
     global pen_size
     pen_size = int(val)
+    text_val = "Pen Size: " + str(pen_size)
+    label_pen_size.configure(text=text_val)
     
 def change_slice_portion(val):
     global slice_portion
     slice_portion = int(val)
+    text_val = "Slice: " + str(slice_portion)
+    label_slice.configure(text=text_val)
     plot_image()
-    
-def change_gaussian_val(val):
-    global gaussian_intensity
-    gaussian_intensity = int(val)
-    filters.gaussian(nii_2d_image,gaussian_intensity)
-    refresh_image()
-    
-def change_ksize_val(val):
-    global kernel_size_amount
-    kernel_size_amount = int(val)
-    filters.laplacian(nii_2d_image,kernel_size_amount,scale_number, delta_factor)
-    refresh_image()
-    
-def change_scale_val(val):
-    global scale_number
-    scale_number = int(val)
-    filters.laplacian(nii_2d_image,kernel_size_amount,scale_number, delta_factor)
-    refresh_image()
-    
-def change_delta_val(val):
-    global delta_factor
-    delta_factor = int(val)
-    filters.laplacian(nii_2d_image,kernel_size_amount,scale_number, delta_factor)
-    refresh_image()
-    
-def change_threshold_val(val):
-    global threshold_value
-    threshold_value = int(val)
-    filters.thresholding(nii_2d_image,threshold_value)
-    refresh_image()
-    
-def change_isodata_threshold_val(val):
-    global isodata_threshold
-    isodata_threshold = int(val)
-    
-def change_isodata_tolerance_val(val):
-    global isodata_tolerance
-    isodata_tolerance = int(val)
-    
+
 def change_tolerance_val(val):
     global tolerance_value
     tolerance_value = int(val)
     Tolerance_slider.set(val)
-  
+    text_val = "Tolerance: " + str(tolerance_value)
+    label_tolerance.configure(text=text_val)
+
 def switch_event():
     if(switch_var.get() == "on"):
         include()
@@ -193,21 +185,22 @@ def exclude():
 def draw(event):
     global last_x, last_y
     x, y = event.x, event.y
-    #drawing_canvas.create_line(last_x, last_y, x, y, fill=pen_color, width=pen_size*2, capstyle="round", smooth=True)
     picture_canvas.create_line(last_x, last_y, x, y, fill=pen_color, width=pen_size*2, capstyle="round", smooth=True)
     
-    # Save canvas image
-    draw_selection = Image.open("temp/selection_canvas.png")
+    # Check if selection_canvas exists
+    try:
+        draw_selection = Image.open("temp/selection_canvas.png")
+    except FileNotFoundError:
+        # Create a new image if selection_canvas doesn't exist
+        reference = Image.open('temp/plot.png')
+        draw_selection = Image.new("RGB", (reference.width, reference.height), (0,0,0))
+
     
     # Draw on the canvas image
     draw = ImageDraw.Draw(draw_selection)
     draw.line((last_x, last_y, x, y), fill=pen_color, width=pen_size*2)
     drawing_canvas.create_line(last_x, last_y, x, y, fill=pen_color, width=pen_size*2, capstyle="round", smooth=True)
     draw_selection.save("temp/selection_canvas.png", format='png')
-    
-    #draw = ImageDraw.Draw(draw_selection)
-    #draw.line((last_x, last_y, x, y), fill=pen_color, width=pen_size*2, joint='curve')
-    #draw_selection.save("temp/selection_canvas.png",format='png')
     
     last_x, last_y = x, y
 
@@ -219,13 +212,20 @@ def end_draw(event):
     #referencia.save()
     pass
  
-def clear_canvas():
-    global pen_size, pen_color
-    drawing_canvas.delete("all")
+def restore_original():
+    global pen_color
     picture_canvas.create_image(0, 0, image=picture_canvas.image, anchor="nw")
     plot_original = Image.open("temp/original.png")
     plot_original.save("temp/plot.png", format='png')
+    selection_image = Image.new("RGB",(plot_original.width,plot_original.height),(0,0,0))
+    pen_color = "#00cd00"
+    mode_switch.select()
+    refresh_image()     
+
+def erase_selection():
+    global pen_size, pen_color
     plot_image = Image.open("temp/plot.png")
+    drawing_canvas.delete("all")
     selection_image = Image.new("RGB",(plot_image.width,plot_image.height),(0,0,0))
     selection_image.save("temp/selection_canvas.png",format='png')
     selection_image.save("temp/green_mask.png",format='png')
@@ -252,7 +252,7 @@ def filters_window():
         delta_slider.set(0)
         threshold_value=100
         threshold_slider.set(100)
-        isodata_threshold_slider.set(0)
+        isodata_threshold_slider.set(100)
         
     def apply_isodata():
         new_threshold = filters.isodata(nii_2d_image,isodata_threshold,isodata_tolerance)
@@ -260,12 +260,63 @@ def filters_window():
         isodata_threshold_slider.set(new_threshold)
         refresh_image()
 
+    def change_gaussian_val(val):
+        global gaussian_intensity
+        gaussian_intensity = int(val)
+        filters.gaussian(nii_2d_image,gaussian_intensity)
+        text_val = "Gaussian Intensity: " + str(gaussian_intensity)
+        label_Gaussian.configure(text=text_val)
+        refresh_image()
+              
+    def change_ksize_val(val):
+        global kernel_size_amount
+        kernel_size_amount = int(val)
+        filters.laplacian(nii_2d_image,kernel_size_amount,scale_number, delta_factor)
+        text_val = "Kernel Size: " + str(kernel_size_amount)
+        label_ksize.configure(text=text_val)
+        refresh_image()
+        
+    def change_scale_val(val):
+        global scale_number
+        scale_number = int(val)
+        filters.laplacian(nii_2d_image,kernel_size_amount,scale_number, delta_factor)
+        text_val = "Scale: " + str(scale_number)
+        label_scale.configure(text=text_val)
+        refresh_image()
+        
+    def change_delta_val(val):
+        global delta_factor
+        delta_factor = int(val)
+        filters.laplacian(nii_2d_image,kernel_size_amount,scale_number, delta_factor)
+        text_val = "Delta: " + str(delta_factor)
+        label_delta.configure(text=text_val)
+        refresh_image()
+        
+    def change_threshold_val(val):
+        global threshold_value
+        threshold_value = int(val)
+        filters.thresholding(nii_2d_image,threshold_value)
+        text_val = "Threshold: " + str(threshold_value)
+        label_Threshold.configure(text=text_val)
+        refresh_image()
+        
+    def change_isodata_threshold_val(val):
+        global isodata_threshold
+        isodata_threshold = int(val)
+        text_val = "Isodata Threshold: " + str(isodata_threshold)
+        label_Isodata.configure(text=text_val)
+             
+    def change_isodata_tolerance_val(val):
+        global isodata_tolerance
+        isodata_tolerance = int(val)
+        if isodata_tolerance == 0 : isodata_tolerance = 0.001
+        text_val = "Tolerance: " + str(isodata_tolerance)
+        label_Isodata_tolerance.configure(text=text_val)
+    
     
     # Toplevel object which will 
     # be treated as a new window
     filters_window = Toplevel(root)
-    
-    options = []
     
     # deactivate the filters button while this windows is open to avoid repeated instances
     filters_button.configure(state="disabled")
@@ -275,17 +326,17 @@ def filters_window():
     filters_window.title("Image Filters Selector")
  
     # sets the geometry of toplevel
-    filters_window.geometry("900x450")
+    filters_window.geometry("350x450")
 
     # spacer
     ctk.CTkLabel(master=filters_window,text="Filtering Options", height=40).pack(pady=15)
     
     # frame grid for filters
-    filters_frame = tk.Frame(master=filters_window)
+    filters_frame = ctk.CTkScrollableFrame(master=filters_window, width=300,height=230, orientation="horizontal")
     filters_frame.pack()
     
     # Gaussian frame
-    gaussian_frame = tk.Frame(master=filters_frame)
+    gaussian_frame = ctk.CTkFrame(master=filters_frame)
     gaussian_frame.grid(row=0, column=0, padx=15, pady=5)
     #gaussian_frame.pack()
     
@@ -294,17 +345,18 @@ def filters_window():
     gaussian_label.pack(pady=15)
 
     # Label for the Gaussian slider
-    label_Gaussian = ctk.CTkLabel(master=gaussian_frame, text="Gaussian intensity:")
+    text_val = "Gaussian intensity: " + str(gaussian_intensity)
+    label_Gaussian = ctk.CTkLabel(master=gaussian_frame, text=text_val)
     label_Gaussian.pack()
 
     # Gaussian filter slider
-    gaussian_slider = ctk.CTkSlider(master=gaussian_frame, from_=1, to=13, command=change_gaussian_val, width=120)
+    gaussian_slider = ctk.CTkSlider(master=gaussian_frame, from_=1, to=13 , command=change_gaussian_val, width=120)
     gaussian_slider.set(0)
     gaussian_slider.pack(pady=5)
 
     
     # Laplacian frame
-    laplacian_frame = tk.Frame(master=filters_frame)
+    laplacian_frame = ctk.CTkFrame(master=filters_frame)
     laplacian_frame.grid(row=0, column=1, padx=15, pady=5)
     #laplacian_frame.pack()
     
@@ -313,7 +365,8 @@ def filters_window():
     laplacian_label.pack(pady=15)
     
     # Label for the ksize slider
-    label_ksize = ctk.CTkLabel(master=laplacian_frame, text="Laplacian Kernel Size")
+    text_val = "Kernel Size: " + str(kernel_size_amount)
+    label_ksize = ctk.CTkLabel(master=laplacian_frame, text=text_val)
     label_ksize.pack()
 
     # ksize slider
@@ -322,7 +375,8 @@ def filters_window():
     ksize_slider.pack(pady=5)
     
     # Label for the scale slider
-    label_scale = ctk.CTkLabel(master=laplacian_frame, text="Laplacian Scale")
+    text_val = "Scale: " + str(scale_number)
+    label_scale = ctk.CTkLabel(master=laplacian_frame, text=text_val)
     label_scale.pack()
 
     # scale slider
@@ -331,7 +385,8 @@ def filters_window():
     scale_slider.pack(pady=5)
     
     # Label for the scale slider
-    label_delta = ctk.CTkLabel(master=laplacian_frame, text="Laplacian Delta")
+    text_val = "Delta: " + str(delta_factor)
+    label_delta = ctk.CTkLabel(master=laplacian_frame, text=text_val)
     label_delta.pack()
 
     # scale slider
@@ -340,15 +395,16 @@ def filters_window():
     delta_slider.pack(pady=5)
     
     # Thresholding frame
-    thresholding_frame = tk.Frame(master=filters_frame)
+    thresholding_frame = ctk.CTkFrame(master=filters_frame)
     thresholding_frame.grid(row=0, column=2, padx=15, pady=5)
     
     # Thresholding options
     gaussian_label = ctk.CTkLabel(master=thresholding_frame, text="Thresholding Options", height=10)
     gaussian_label.pack(pady=15)
 
-    # Label for the Threshold slider
-    label_Threshold = ctk.CTkLabel(master=thresholding_frame, text="Threshold:")
+    # Label for the Thresholding slider
+    text_val = "Threshold: " + str(threshold_value)
+    label_Threshold = ctk.CTkLabel(master=thresholding_frame, text=text_val)
     label_Threshold.pack()
 
     # Threshold  slider
@@ -357,20 +413,21 @@ def filters_window():
     threshold_slider.pack(pady=5)
     
     buttons_frame = tk.Frame(master=filters_window)
-    buttons_frame.pack(pady=30)
+    buttons_frame.pack(pady=15)
     
     
     # Isodata frame
-    isodata_frame = tk.Frame(master=filters_frame)
+    isodata_frame = ctk.CTkFrame(master=filters_frame)
     isodata_frame.grid(row=0, column=3, padx=15, pady=5)
     #gaussian_frame.pack()
     
-    # Gaussian slider
+    # isodata options label
     isodata_label = ctk.CTkLabel(master=isodata_frame, text="Isodata Options", height=10)
     isodata_label.pack(pady=15)
 
     # Label for the Gaussian slider
-    label_Isodata = ctk.CTkLabel(master=isodata_frame, text="Isodata initial threshold:")
+    text_val = "Treshold: " + str(isodata_threshold)
+    label_Isodata = ctk.CTkLabel(master=isodata_frame, text=text_val)
     label_Isodata.pack()
 
     # Isodata threshold slider
@@ -378,21 +435,44 @@ def filters_window():
     isodata_threshold_slider.set(100)
     isodata_threshold_slider.pack(pady=5)
     
+    # Label for the isodata tolerance slider
+    text_val = "Tolerance: " + str(isodata_tolerance)
+    label_Isodata_tolerance = ctk.CTkLabel(master=isodata_frame, text=text_val)
+    label_Isodata_tolerance.pack()
+
+    # Isodata tolerance slider
+    isodata_tolerance_slider = ctk.CTkSlider(master=isodata_frame, from_=0.1, to=10, number_of_steps=1000, command=change_isodata_tolerance_val, width=120)
+    isodata_tolerance_slider.set(0.001)
+    isodata_tolerance_slider.pack(pady=5)
+    
     # An apply button for isodata iterations
-    isodata_apply_button = ctk.CTkButton(master=isodata_frame, text ="Apply Isodata", command=apply_isodata)
+    isodata_apply_button = ctk.CTkButton(master=isodata_frame, text ="Preview Isodata", command=apply_isodata)
     isodata_apply_button.pack(pady=5)
     
-    # restore image Button
-    restore_image_button = ctk.CTkButton(master=buttons_frame, text="Restore Image",  command=lambda: [restore_data(),restore_sliders()])
-    restore_image_button.grid(row=0, column=0, padx=5, pady=5)
+    # cancel Button
+    cancel_filter = ctk.CTkButton(master=buttons_frame, text="Cancel",  command=lambda: [plot_image(),restore_sliders(),filters_window.destroy(),filters_button.configure(state="normal")])
+    cancel_filter.grid(row=0, column=0, padx=5, pady=5)
     
-    # A cancel button to discard changes
-    close_button = ctk.CTkButton(master=buttons_frame, text ="Close", command=lambda: [filters_window.destroy(),filters_button.configure(state="normal")])
-    close_button.grid(row=0, column=1, padx=5, pady=5)
+    # apply filter Button
+    apply_filter_button = ctk.CTkButton(master=buttons_frame, text="Apply Filter",  command=lambda: [filters_window.destroy(),filters_button.configure(state="normal")])
+    apply_filter_button.grid(row=0, column=1, padx=5, pady=5)
+
+def step():
+    undo_image = Image.open("temp/plot.png")
+    undo_image_array = np.array(undo_image)
     
+    unfo_fig = plt.figure(facecolor='black')
+    undo_plot = unfo_fig.add_subplot(111)
+    undo_image = plt.imshow(undo_image_array, cmap='gray')
+    plt.xticks([])
+    plt.yticks([])
+    plt.savefig("temp/undo.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
+
 def apply_segmentation():
     selection_image = Image.open("temp/selection_canvas.png")
     selection_array = np.array(selection_image)
+    
+    step()
     
     red_mask = (selection_array[:,:,0] > 200)
     red_mask_fig = plt.figure(facecolor='black')
@@ -422,136 +502,142 @@ def apply_segmentation():
     time.sleep(0.0016)
     plt.savefig("temp/visited_mask.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
     
-    original_image = Image.open("temp/original.png").convert('L')
-    original_image_plot = np.array(original_image)
+    #original_image = Image.open("temp/original.png").convert('L')
+    ploted_image = Image.open("temp/plot.png").convert('L')
+    image_plot = np.array(ploted_image)
     
-    filters.regionGrowing(original_image_plot, tolerance_value)
+    filters.regionGrowing(image_plot, tolerance_value)
     refresh_image()
-    
-def restore_data():
-    global nii_2d_image, nii_3dimage_backup
-    nii_2d_image = nii_3dimage_backup
-    plot_image()
-
-
+        
 
 # left Frame which contains the tools and options
 left_frame = ctk.CTkFrame(root, height=screen_height)
 left_frame.pack(side='left', fill='y')
 
+# Create a Canvas scrollable frame widget for left frame
+#left_frame_canvas_scroll = ctk.CTkScrollableFrame(left_frame, height=screen_height, orientation="vertical")
+#left_frame_canvas_scroll.pack(side='left', fill='both', expand=True)
+
 # Create a Canvas widget for left frame
-left_frame_canvas = ctk.CTkCanvas(left_frame, height=600)
+left_frame_canvas = ctk.CTkFrame(left_frame, height=screen_height)
 left_frame_canvas.pack(side='left', fill='both', expand=True)
-
-# Add a scrollbar
-scrollbar = ctk.CTkScrollbar(left_frame_canvas, orientation='vertical', command=left_frame_canvas.yview)
-#scrollbar.pack_forget()  # Hide the scrollbar
-
-# Configure the canvas to scroll with the scrollbar
-left_frame_canvas.configure(yscrollcommand=scrollbar.set)
-
-# Frame to contain the tools and options
-tools_frame = ctk.CTkFrame(left_frame_canvas)
-left_frame_canvas.create_window((0, 0), window=tools_frame, anchor='nw')
-
-# Function to update scroll region
-def update_scroll_region(event):
-    left_frame_canvas.configure(scrollregion=left_frame_canvas.bbox('all'))
-    
-# Bind event to update scroll region
-tools_frame.bind('<Configure>', update_scroll_region)
 
 # diferent Canvas overlaped on the rest of the window
 # the main canvas frame
-canvas_frame = ctk.CTkFrame(root, width=750, height=600)
-canvas_frame.pack(pady=50, padx=15)
+right_frame = ctk.CTkFrame(root, width=750, height=600)
+right_frame.pack(pady=10, padx=10, fill="both", expand=True)
 
+# the main canvas frame
+canvas_frame = ctk.CTkFrame(right_frame, width=750, height=600)
+canvas_frame.pack(pady=10, padx=10)
 
 # the picture canvas where we show the image (under the drawing canvas)
 picture_canvas = ctk.CTkCanvas(canvas_frame, width=750, height=600)
 picture_canvas.pack()
 
-# the drawing canvas where we keep the user selection
-drawing_canvas = tk.Canvas(canvas_frame, width=750, height=600)
-#drawing_canvas.grid(column=1,row=0)
+# the drawing canvas where we keep the user selection (not shown)
+drawing_canvas = ctk.CTkCanvas(canvas_frame, width=750, height=600)
+
+# frame that contains the canvas tools
+canva_tools_frame = ctk.CTkFrame(right_frame, width=750, height=600)
+canva_tools_frame.pack(pady=10, padx=10, fill="x", expand=True)
+
+canva_tools_frame.rowconfigure(1, weight=1)
+canva_tools_frame.columnconfigure(0, weight=1)
+canva_tools_frame.columnconfigure(1, weight=1)
+canva_tools_frame.columnconfigure(2, weight=1)
+
+# frame for buttons
+tools_button_frame = tk.Frame(canva_tools_frame)
+tools_button_frame.grid(row=0,column=0,pady=5)
+
+# Clear canva button
+clear_button = ctk.CTkButton(tools_button_frame, text="Clear Canvas", state="disabled", command=erase_selection)
+clear_button.pack(pady=5)
+
+# Filters button
+filters_button = ctk.CTkButton(tools_button_frame, text="More Filters", command=filters_window)
+filters_button.pack(pady=5)
+
+view_frame = tk.Frame(canva_tools_frame)
+view_frame.grid(row=0,column=1,pady=5)
+
+# Define the options for the dropdown
+view_options = ["Axial", "Coronal", "Sagittal"]
+
+def handle_dropdown_selection(selection):
+    view_mode.set(selection)
+    plot_image()    
+
+# view mode label
+title_label = ctk.CTkLabel(view_frame, text="View Mode:")
+title_label.pack(padx=10)
+
+# Create the custom dropdown
+view_dropdown = ctk.CTkComboBox(master=view_frame, variable=view_mode, values=view_options, command=handle_dropdown_selection, state="disabled")
+view_dropdown.pack(padx=10)
+
+
+# slice frame
+slice_frame = tk.Frame(canva_tools_frame)
+slice_frame.grid(row=0,column=2,pady=5)
+# Label for the slider
+text_val = "Slice: " + str(slice_portion)
+label_slice = ctk.CTkLabel(master=slice_frame, text=text_val)
+label_slice.pack( padx=10)
+
+# slider
+slice_slider = ctk.CTkSlider(master=slice_frame, from_=1, to=190,state="disabled", command=change_slice_portion, width=120)
+slice_slider.set(slice_portion)
+slice_slider.pack( padx=10)
+
+
 
 # Logo
-logo_frame = ctk.CTkFrame(master=left_frame_canvas,bg_color="transparent")
+logo_frame = tk.Frame(master=left_frame_canvas)
 logo_frame.grid(row=0, pady=15, padx=30)
-canvas_logo = tk.Canvas(master=logo_frame, width=100, height=100)
+canvas_logo = ctk.CTkCanvas(master=logo_frame, width=100, height=100)
 canvas_logo.grid(row=0)
 logo_image = tk.PhotoImage(file="images/logo.png").subsample(4, 4)
 canvas_logo.create_image(50, 50, image=logo_image)
 
 # Title of the tool under the logo
 title_label = ctk.CTkLabel(logo_frame, text="MRI Slice \n Segmentation Tool \n (beta)")
-title_label.grid(row=1, pady=15)
+title_label.grid(row=1, pady=5)
 
 # Upload Button
 upload_button = ctk.CTkButton(left_frame_canvas, text='Upload Image', command=add_image)
 upload_button.grid(row=2,pady=10, padx=20)
 
-# Frame for radio buttons
-radio_frame = ctk.CTkFrame(master=left_frame_canvas)
-radio_frame.grid(row=3,pady=10)
-
-axial_radio = ctk.CTkRadioButton(master=radio_frame, text="Axial", variable=view_mode, value="Axial", command=plot_image)
-axial_radio.grid(row=0, column=0, padx=5, pady=2)
-
-coronal_radio = ctk.CTkRadioButton(master=radio_frame, text="Coronal", variable=view_mode, value="Coronal", command=plot_image)
-coronal_radio.grid(row=1, column=0, padx=5, pady=2)
-
-sagittal_radio = ctk.CTkRadioButton(master=radio_frame, text="Sagittal", variable=view_mode, value="Sagittal", command=plot_image)
-sagittal_radio.grid(row=2, column=0, padx=5, pady=2)
-
-# slice slider
-# Label for the slider
-label_slice = ctk.CTkLabel(master=left_frame_canvas, text="Slice portion:")
-label_slice.grid(row=4,pady=5)
-
-# slider
-slice_slider = ctk.CTkSlider(master=left_frame_canvas, from_=0, to=192,state="disabled", command=change_slice_portion, width=120)
-slice_slider.set(slice_portion)
-slice_slider.grid(row=5)
-
-# margin
-ctk.CTkFrame(master=left_frame_canvas, height=20,bg_color="transparent").grid(row=6,pady=5)
 
 # switch for include/eclude pen
-label = ctk.CTkLabel(master=left_frame_canvas, text="Pen Mode:")
-label.grid(row=7,pady=5)
+label_pen_mode = ctk.CTkLabel(master=left_frame_canvas, text="Pen Mode:")
+#label_pen_mode.grid(row=7,pady=5)
 switch_var = ctk.StringVar(value="on")
 
-
-mode_switch = ctk.CTkSwitch(master=left_frame_canvas, text="Include", state="disabled", command=switch_event,
-                                   variable=switch_var, onvalue="on", offvalue="off")
-mode_switch.grid(row=8, pady=5)
-
-# margin
-ctk.CTkFrame(master=left_frame_canvas, height=20).grid(row=9,pady=5)
+mode_switch = ctk.CTkSwitch(master=left_frame_canvas, text="Include", state="disabled", command=switch_event, variable=switch_var, onvalue="on", offvalue="off")
+#mode_switch.grid(row=8, pady=5)
 
 # Pen size slider
 # Label for the slider
-label = ctk.CTkLabel(master=left_frame_canvas, text="Pen Size:")
-label.grid(row=9,pady=5)
+text_val = "Pen Size: " + str(pen_size)
+label_pen_size = ctk.CTkLabel(master=left_frame_canvas, text=text_val)
+#label_pen_size.grid(row=9,pady=5)
 
 # slider
 pen_size_scale = ctk.CTkSlider(master=left_frame_canvas, from_=1, to=13,state="disabled", command=change_pen_size, width=120)
 pen_size_scale.set(pen_size)
-pen_size_scale.grid(row=10)
+#pen_size_scale.grid(row=10)
 
-ctk.CTkFrame(master=left_frame_canvas, height=20).grid(row=11,pady=5)
 
-# Clear canva button
-clear_button = ctk.CTkButton(left_frame_canvas, text="Clear Canvas", state="disabled", command=clear_canvas)
-clear_button.grid(row=12,pady=10)
 
 # Frame for segmentation tools
-segmentation_tools_frame = ctk.CTkFrame(master=left_frame_canvas)
-segmentation_tools_frame.grid(row=13,pady=10,padx=20)
+segmentation_tools_frame = tk.Frame(master=left_frame_canvas)
+#segmentation_tools_frame.grid(row=13,pady=10,padx=20)
 
 # Label for the tolerance slider
-label_tolerance = ctk.CTkLabel(master=segmentation_tools_frame, text="Tolerance:")
+text_val = "Tolerance: " + str(tolerance_value)
+label_tolerance = ctk.CTkLabel(master=segmentation_tools_frame, text=text_val)
 label_tolerance.pack(pady=5)
 
 # slider tolerance
@@ -561,11 +647,15 @@ Tolerance_slider.pack(pady=5)
 
 # Process image segmentation button
 segmentation_button = ctk.CTkButton(segmentation_tools_frame, text="Apply Region Growing", state="disabled", command=apply_segmentation)
-segmentation_button.pack(pady=5)
+segmentation_button.pack(pady=10)
 
-# Filters button
-filters_button = ctk.CTkButton(left_frame_canvas, text="Filters", state="disabled", command=filters_window)
-filters_button.grid(row=14,pady=10, padx=20)
+# Clear canva button
+restore_button = ctk.CTkButton(left_frame_canvas, text="Restore Original", command=restore_original)
+#segmentation_tools_frame.grid(row=14,pady=10,padx=20)
+
+# Process image segmentation button
+undo_button = ctk.CTkButton(left_frame_canvas, text="Undo", command=undoIt)
+#segmentation_tools_frame.grid(row=15,pady=10,padx=20)
 
 picture_canvas.bind("<Button-1>", start_draw)
 picture_canvas.bind("<B1-Motion>", draw)
@@ -573,7 +663,3 @@ picture_canvas.bind("<ButtonRelease-1>", end_draw)
 
 
 root.mainloop()
-
-
-#mymask = growing(80,84,image_data,25.3,,1000000)
-#regionGrowing(x0,y0,Image,Tolerance,max_iter):
