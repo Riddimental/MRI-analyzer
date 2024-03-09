@@ -21,17 +21,17 @@ y = (screen_height - window_height) // 2
 root.geometry(f"{window_width}x{window_height}+{x}+{y}")
 root.title("MRI Segmentation Tool")
 
-# to find the range of the threshold slider
+# Defining global variables
 max_value = 0
 pen_color = ""
 pen_size = 7
-gaussian_intensity = 1
+gaussian_intensity = 0
 file_path = ""
 nii_2d_image = []
 nii_3d_image = []
 nii_3dimage_backup = []
 slice_portion = 100
-ksize_amount = 5
+kernel_size_amount = 5
 scale_number = 1
 delta_factor = 0
 threshold_value = 100
@@ -42,39 +42,31 @@ tolerance_value=10
 
 # Radio buttons (0) Axial, (1) Coronal, (2) Sagittal
 view_mode = ctk.StringVar(value="Axial")
-selection_image = Image.new("RGB",(200,200),(255,255,255))
+selection_image = Image.new("RGB",(200,200),(0,0,0))
 
+# function to refresh the canva with the lates plot update
 def refresh_image():
     global selection_image
-    # placing plot in the canvas
+    # givin the function time to avoid over-refreshing
     time.sleep(0.0008)
     plot_image = Image.open("temp/plot.png")
-    #width, height = int(plot_image.width * 3), int(plot_image.height * 3) # upscaling the plot_image
-    #plot_image = plot_image.resize((width, height))
     
-    # adjusting the canvas to be the same size
+    # adjusting the canvas to be the same size as the plot
     drawing_canvas.config(width=plot_image.width, height=plot_image.height)
     picture_canvas.config(width=plot_image.width, height=plot_image.height)
-    selection_image = Image.new("RGB",(plot_image.width,plot_image.height),(0,0,0))
-    selection_image.save("temp/selection_canvas.png",format='png')
-    selection_image.save("temp/green_mask.png",format='png')
-    selection_image.save("temp/red_mask.png",format='png')
-    selection_image.save("temp/visited_mask.png",format='png')
 
-    
+    # printing the picture in the canvas
     image = ImageTk.PhotoImage(plot_image)
     picture_canvas.image = image
     picture_canvas.create_image(0, 0, image=image, anchor="nw")
-    #drawing_canvas.image = image
-    #drawing_canvas.create_image(0, 0, image=image, anchor="nw")
 
+# function to plot the readed .nii image
 def plot_image():
     global max_value, nii_2d_image, nii_3d_image, pen_color, slice_portion
     
     #mpl.rcParams['savefig.pad_inches'] = 0
     
     # selecting a slice out of the 3d image
-    
     if(view_mode.get() == "Axial"):
         nii_2d_image = nii_3d_image[:,:,slice_portion]
     elif(view_mode.get() == "Coronal"):
@@ -125,6 +117,8 @@ def add_image():
             
             # runs function to update background
             plot_image()
+            clear_canvas()
+            
         except Exception as e:
             print("Error loading image:", e)
     else:
@@ -146,21 +140,21 @@ def change_gaussian_val(val):
     refresh_image()
     
 def change_ksize_val(val):
-    global ksize_amount
-    ksize_amount = int(val)
-    filters.laplacian(nii_2d_image,ksize_amount,scale_number, delta_factor)
+    global kernel_size_amount
+    kernel_size_amount = int(val)
+    filters.laplacian(nii_2d_image,kernel_size_amount,scale_number, delta_factor)
     refresh_image()
     
 def change_scale_val(val):
     global scale_number
     scale_number = int(val)
-    filters.laplacian(nii_2d_image,ksize_amount,scale_number, delta_factor)
+    filters.laplacian(nii_2d_image,kernel_size_amount,scale_number, delta_factor)
     refresh_image()
     
 def change_delta_val(val):
     global delta_factor
     delta_factor = int(val)
-    filters.laplacian(nii_2d_image,ksize_amount,scale_number, delta_factor)
+    filters.laplacian(nii_2d_image,kernel_size_amount,scale_number, delta_factor)
     refresh_image()
     
 def change_threshold_val(val):
@@ -181,8 +175,7 @@ def change_tolerance_val(val):
     global tolerance_value
     tolerance_value = int(val)
     Tolerance_slider.set(val)
-
-    
+  
 def switch_event():
     if(switch_var.get() == "on"):
         include()
@@ -230,28 +223,28 @@ def clear_canvas():
     global pen_size, pen_color
     drawing_canvas.delete("all")
     picture_canvas.create_image(0, 0, image=picture_canvas.image, anchor="nw")
-    plot_image = Image.open("temp/plot.png")
     plot_original = Image.open("temp/original.png")
     plot_original.save("temp/plot.png", format='png')
+    plot_image = Image.open("temp/plot.png")
     selection_image = Image.new("RGB",(plot_image.width,plot_image.height),(0,0,0))
     selection_image.save("temp/selection_canvas.png",format='png')
     selection_image.save("temp/green_mask.png",format='png')
     selection_image.save("temp/red_mask.png",format='png')
+    selection_image.save("temp/visited_mask.png",format='png')
     pen_size_scale.set(7)
     pen_color = "#00cd00"
     mode_switch.select()
     refresh_image()     
-
 
 def filters_window():
     
     global nii_2d_image
     
     def restore_sliders():
-        global threshold_value,gaussian_intensity,slice_portion,ksize_amount, scale_number, delta_factor
+        global threshold_value,gaussian_intensity,slice_portion,kernel_size_amount, scale_number, delta_factor
         gaussian_intensity=0
         gaussian_slider.set(0)
-        ksize_amount=5
+        kernel_size_amount=5
         ksize_slider.set(5)
         scale_number=1
         scale_slider.set(1)
@@ -428,13 +421,11 @@ def apply_segmentation():
     plt.yticks([])
     time.sleep(0.0016)
     plt.savefig("temp/visited_mask.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
-    #print("Mask created")
     
     original_image = Image.open("temp/original.png").convert('L')
     original_image_plot = np.array(original_image)
     
-    #print("shapeshape",original_image_plot.shape)
-    filters.regionGrowing(original_image_plot ,tolerance_value,10000)
+    filters.regionGrowing(original_image_plot, tolerance_value)
     refresh_image()
     
 def restore_data():
@@ -454,7 +445,7 @@ left_frame_canvas.pack(side='left', fill='both', expand=True)
 
 # Add a scrollbar
 scrollbar = ctk.CTkScrollbar(left_frame_canvas, orientation='vertical', command=left_frame_canvas.yview)
-scrollbar.pack_forget()  # Hide the scrollbar
+#scrollbar.pack_forget()  # Hide the scrollbar
 
 # Configure the canvas to scroll with the scrollbar
 left_frame_canvas.configure(yscrollcommand=scrollbar.set)
@@ -552,7 +543,7 @@ pen_size_scale.grid(row=10)
 ctk.CTkFrame(master=left_frame_canvas, height=20).grid(row=11,pady=5)
 
 # Clear canva button
-clear_button = ctk.CTkButton(left_frame_canvas, text="Clear Selection", state="disabled", command=clear_canvas)
+clear_button = ctk.CTkButton(left_frame_canvas, text="Clear Canvas", state="disabled", command=clear_canvas)
 clear_button.grid(row=12,pady=10)
 
 # Frame for segmentation tools
@@ -564,7 +555,7 @@ label_tolerance = ctk.CTkLabel(master=segmentation_tools_frame, text="Tolerance:
 label_tolerance.pack(pady=5)
 
 # slider tolerance
-Tolerance_slider = ctk.CTkSlider(master=segmentation_tools_frame, from_=1, to=192,state="disabled", command=change_tolerance_val, width=120)
+Tolerance_slider = ctk.CTkSlider(master=segmentation_tools_frame, from_=1, to=100,state="disabled", command=change_tolerance_val, width=120)
 Tolerance_slider.set(25)
 Tolerance_slider.pack(pady=5)
 

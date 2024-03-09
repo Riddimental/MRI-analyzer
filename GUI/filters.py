@@ -119,122 +119,79 @@ def N8(x0,y0,M,N):
    #print("neigborhood size ",len(neighborhood), neighborhood)
    return neighborhood
 
-#def regionGrowing(selection_mask, image ,Tolerance , max_iter=1e6):
-   mask = np.zeros(image.shape)
-   visited = np.zeros(image.shape)
-   
-   print("mask",selection_mask)
-   visited_mask_image = Image.open("temp/visited_mask.png").convert("1")
-   visited = np.array(visited_mask_image)
-   #print("visited",visited)
-   original_image = Image.open("temp/plot.png")
-   Image_data = np.array(original_image)
-   print("original",Image_data[20,20])
-   
-   
-   # Get non-zero coordinates
-   nonzero_coords = []
-   for x in range(mask.shape[0]):
-      for y in range(mask.shape[1]):
-         if mask[x, y] != 0:
-               nonzero_coords.append((x, y))
-   # print("nonzero", nonzero_coords)
-               
-   # Get visited coordinates
-   visited_coords = []
-   for x in range(visited.shape[0]):
-      for y in range(visited.shape[1]):
-         if visited[x, y] != 0:
-               visited_coords.append((x, y))
-   #print("visited", visited_coords)
-               
-   #print("size",selection_mask.width, selection_mask.height)
-   # actual size of the image
-   N,M = image.shape
-   #print("m y n son",M,N)
+def get_white_pixels(image):
+    # Convert image to grayscale if it's not already
+    if image.mode != "L":
+        image = image.convert("L")
 
-   # define a queue where the points to be procesed goes
-   neighbor_queue = nonzero_coords
-   
-   #print("neighbors",neighbor_queue )
+    # Get image dimensions
+    width, height = image.size
 
-   iterations = 0
+    # Initialize list to store white pixel coordinates
+    white_pixels = []
 
-   # This will run until the neighbor list is empty
-   while len(neighbor_queue) > 0:
-      # Get the first element of the list
-      x0, y0 = neighbor_queue.pop()
+    # Iterate through image pixels
+    for y in range(height):
+        for x in range(width):
+            # Get pixel value
+            pixel = image.getpixel((x, y))
+            # Check if pixel is white (255)
+            if pixel == 255:
+                white_pixels.append((x, y))
 
-      # Iterate over the neighbors
-      for x1, y1 in N4(x0, y0, M, N):
-         if 0 <= x1 < M and 0 <= y1 < N and abs(Image_data[x1, y1,0] - Image_data[x0, y0,0]) <= Tolerance and np.all(mask[x1, y1,0] == 0) and np.all(visited[x1, y1,0] == 0):
-            print('yes')
-            neighbor_queue.append((x1, y1))
+    return white_pixels
 
-      mask[x0, y0,:] = 1
-      visited[x0, y0,:] = 1
-      iterations += 1
+def regionGrowing(image, threshold):
+   # Create a mask to keep track of visited pixels
+   mask = np.zeros_like(image, dtype=bool)
 
-      if iterations > max_iter:
-         print("overgrown")
-         break
+   # Get image dimensions
+   height, width = image.shape[:2]
+   # Initialize segmented image
+   segmented_image = np.zeros_like(image)
 
-   growing_fig = plt.figure(facecolor='black')
-   growing_image_plot = growing_fig.add_subplot(111)
-   growing_image_plot.imshow(mask, cmap='gray')
-   plt.xticks([])
-   plt.yticks([])
-   time.sleep(0.0016)
-   plt.savefig("temp/plot.png", format='png', dpi=120, bbox_inches='tight', pad_inches=0)
-   
-   #return mask
+   # Define 4-connectivity neighbors
+   neighbors = [(1, 0), (-1, 0), (0, 1), (0, -1)
+               #,(-1,-1),(1,1),(-1,1),(1,-1) #it works the same with 8 or 4 neighbors, still dont know which one is more efficient
+               ]
+   # Load PNG image of selected region
+   selected_image = Image.open("temp/green_mask.png")
 
+   # load visited mask png image
+   visited = Image.open("temp/visited_mask.png").convert('L')
+   visited_pixels = get_white_pixels(visited)
+   # Set visited pixels to True in the mask
+   for x, y in visited_pixels:
+      mask[y, x] = True
 
-def regionGrowing(Image_data ,Tolerance, max_iter):
-   mask = np.zeros(Image_data.shape)
-   visited = np.zeros(Image_data.shape)
-   #print("mask size",mask.shape)
-   
-   mask_image = Image.open("temp/green_mask.png").convert('L')
-   mask_array = np.array(mask_image)
-   #print("dato?",mask_array)
-   # get coordenates where the pixel has a value above 0
-   true_coords = list(zip(*np.where(mask_array > 0)))
-   #print("las tuplas",true_coords)
-   
-   N,M = Image_data.shape
-   
-   neighbors_queue = []
-   neighbors_queue = true_coords
-   #neighbors_queue.append(true_coords)
-   #print("neigh queue", neighbors_queue)
-    
-   iterations = 0
-   
-   while neighbors_queue:
-      x0,y0 = neighbors_queue.pop()
-      print(x0,y0)
-      for x1,y1 in N4(x0,y0,M,N):
-         if(distance(x0,y0,x1,y1,Image_data)) <= Tolerance and mask[x1,y1] == 0 and visited[x1,y1] == 0:
-            
-            print("Dimensiones de Image_data:", Image_data.shape)
-            print("Coordenadas (x1, y1):", x1, y1)
-            neighbors_queue.append((x1,y1))
-      mask[x0,y0] = 1
-      visited[x0,y0] = 1
-      iterations += 1
+   # Perform region growing
+   starting_list = get_white_pixels(selected_image)
+   stack = starting_list
+   count = 0
+   seed_value = 0
+   while stack:
+      x, y = stack.pop()
+      segmented_image[y, x] = 255  # Mark pixel as part of the segmented region
+      mask[y, x] = True  # Mark pixel as visited
       
-      if iterations > max_iter:
-         print("overgrown")
-         break
-   
+      # Update seed value and count for dynamic mean calculation
+      count += 1
+      seed_value += (image[y, x] - seed_value) / count
+
+      # Check 4-connectivity neighbors
+      for dx, dy in neighbors:
+         nx, ny = x + dx, y + dy
+         # Check if neighbor is within image bounds and not visited
+         if 0 <= nx < width and 0 <= ny < height and not mask[ny, nx]:
+               # Check intensity difference
+               if abs(int(image[ny, nx]) - int(seed_value)) < threshold:
+                  stack.append((nx, ny))
+                    
    # GrownRegion image
    grownRegion_fig = plt.figure(facecolor='black')
    grownRegion_image_plot = grownRegion_fig.add_subplot(111)
    plt.xticks([])
    plt.yticks([])
    time.sleep(0.0016)
-   grownRegion_image_plot.imshow(mask, cmap='gray')
+   grownRegion_image_plot.imshow(segmented_image, cmap='gray')
    plt.savefig("temp/plot.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
-      
-   #return mask
