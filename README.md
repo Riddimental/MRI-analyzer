@@ -57,14 +57,25 @@ select the MRI image in .nii format like so:
 
 now the first print of your file should appear along with the tools and options for you to tweak it
 
-![Main interface](screenshots/interface.png)
+![File selection](screenshots/coronal.png)
 
 you have many options, segmenting a visualizing options, along with a slider to see each and every slice of your 3d image
 
-![File selection](screenshots/coronal.png)
+![Main interface](screenshots/sagital.png)
+
+![Main interface](screenshots/interface.png)
+
+for applying the segmentation, first we use the pencil tool to highlight the region of interest (green color), and the avoid region (red color)
 
 ![File selection](screenshots/axial.png)
 
+after drawing your selection, hit the "apply segmentation" button to start the Region Growing segmentation:
+
+![Main interface](screenshots/segmented_axial.png)
+
+you can apply other filters before the segmentation, feel free to play with the parameters in the filters window!
+
+![Main interface](screenshots/filters.png)
 
 
 ## Dependencies
