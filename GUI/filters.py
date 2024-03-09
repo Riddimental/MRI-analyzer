@@ -143,7 +143,7 @@ def get_white_pixels(image):
 
 def regionGrowing(image, threshold):
    # Create a mask to keep track of visited pixels
-   mask = np.zeros_like(image, dtype=bool)
+   visited_mask = np.zeros_like(image, dtype=bool)
 
    # Get image dimensions
    height, width = image.shape[:2]
@@ -158,11 +158,11 @@ def regionGrowing(image, threshold):
    selected_image = Image.open("temp/green_mask.png")
 
    # load visited mask png image
-   visited = Image.open("temp/visited_mask.png").convert('L')
-   visited_pixels = get_white_pixels(visited)
+   visited_image = Image.open("temp/visited_mask.png").convert('L')
+   visited_tuples = get_white_pixels(visited_image)
    # Set visited pixels to True in the mask
-   for x, y in visited_pixels:
-      mask[y, x] = True
+   for x, y in visited_tuples:
+      visited_mask[y, x] = True
 
    # Perform region growing
    starting_list = get_white_pixels(selected_image)
@@ -172,7 +172,7 @@ def regionGrowing(image, threshold):
    while stack:
       x, y = stack.pop()
       segmented_image[y, x] = 255  # Mark pixel as part of the segmented region
-      mask[y, x] = True  # Mark pixel as visited
+      visited_mask[y, x] = True  # Mark pixel as visited
       
       # Update seed value and count for dynamic mean calculation
       count += 1
@@ -182,7 +182,7 @@ def regionGrowing(image, threshold):
       for dx, dy in neighbors:
          nx, ny = x + dx, y + dy
          # Check if neighbor is within image bounds and not visited
-         if 0 <= nx < width and 0 <= ny < height and not mask[ny, nx]:
+         if 0 <= nx < width and 0 <= ny < height and not visited_mask[ny, nx]:
                # Check intensity difference
                if abs(int(image[ny, nx]) - int(seed_value)) < threshold:
                   stack.append((nx, ny))
