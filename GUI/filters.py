@@ -1,12 +1,31 @@
 import math
-import sys
 import time
-import nibabel as nib
 import numpy as np
 #np.set_printoptions(threshold=sys.maxsize)
 import matplotlib.pyplot as plt
-from PIL import Image, ImageTk, ImageDraw
+from PIL import Image
 import cv2
+import os
+import shutil
+
+def delete_temp():
+   # Delete the contents of the temp folder
+   folder_path = "temp"
+
+   # Check if the folder exists
+   if os.path.exists(folder_path):
+      # Iterate over the files in the folder and delete them
+      for filename in os.listdir(folder_path):
+         file_path = os.path.join(folder_path, filename)
+         try:
+               if os.path.isfile(file_path):
+                  os.unlink(file_path)
+               elif os.path.isdir(file_path):
+                  shutil.rmtree(file_path)
+         except Exception as e:
+               print(f"Failed to delete {file_path}. Reason: {e}")
+   else:
+      print(f"The folder {folder_path} does not exist.")
 
 def gaussian(data, intensity):
    data = cv2.GaussianBlur(data,(math.trunc(intensity),math.trunc(intensity)),0)

@@ -66,8 +66,8 @@ The interface offers various options, including different filters and visualizat
 
 ![Main interface](screenshots/sagital.png)
 
-![Main interface](screenshots/interface.gif)
 ![Image Slices](screenshots/slices.gif)
+![Main interface](screenshots/interface.gif)
 
 To apply segmentation, first utilize the pencil tool to highlight the region of interest (marked in green) and the areas to avoid (marked in red):
 
@@ -95,7 +95,6 @@ You can apply additional filters before segmentation; feel free to experiment wi
 - `numpy`: A powerful library for numerical computing.
 - `nibabel`: A library for reading and writing neuroimaging data in various formats.
 - `matplotlib`: A plotting library for creating static, animated, and interactive visualizations in Python.
-- `filters`: A module for image processing filters and operations.
 
 
 ## Contributing
