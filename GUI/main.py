@@ -1,10 +1,10 @@
 import time
 import os
+import sys
 import customtkinter as ctk
 import numpy as np
 import tkinter as tk
 import nibabel as nib
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import filters
 from tkinter import Toplevel, filedialog
@@ -22,6 +22,8 @@ x = (screen_width - window_width) // 2
 y = (screen_height - window_height) // 2
 root.geometry(f"{window_width}x{window_height}+{x}+{y}")
 root.title("MRI Segmentation Tool")
+# Make the window not resizable
+root.resizable(False, False)
 
 # Defining global variables
 max_value = 0
@@ -39,12 +41,19 @@ delta_factor = 0
 threshold_value = 100
 isodata_tolerance = 0.001
 isodata_threshold = 200
-tolerance_value=10
+tolerance_value=20
 
 
 # Radio buttons (0) Axial, (1) Coronal, (2) Sagittal
 view_mode = ctk.StringVar(value="Axial")
 selection_image = Image.new("RGB",(200,200),(0,0,0))
+
+def close_program():
+    filters.delete_temp()
+    root.destroy()
+    sys.exit()
+    
+root.protocol("WM_DELETE_WINDOW", close_program)
 
 # function to refresh the canva with the lates plot update
 def refresh_image():
@@ -110,7 +119,7 @@ def plot_image():
     mode_switch.grid(row=8, pady=5)
     label_pen_size.grid(row=9,pady=5)
     pen_size_scale.grid(row=10)
-    segmentation_tools_frame.grid(row=13,pady=10,padx=20)
+    segmentation_tools_frame.grid(row=13,pady=5,padx=20)
     restore_button.grid(row=14,pady=10,padx=20)
     undo_button.grid(row=15,pady=10,padx=20)
     pen_color="#00cd00"
@@ -240,6 +249,9 @@ def filters_window():
     
     global nii_2d_image
     
+    ploted_image = Image.open('temp/plot.png').convert('L')
+    ploted_array = np.array(ploted_image)
+    
     def restore_sliders():
         global threshold_value,gaussian_intensity,slice_portion,kernel_size_amount, scale_number, delta_factor
         gaussian_intensity=0
@@ -255,7 +267,7 @@ def filters_window():
         isodata_threshold_slider.set(100)
         
     def apply_isodata():
-        new_threshold = filters.isodata(nii_2d_image,isodata_threshold,isodata_tolerance)
+        new_threshold = filters.isodata(ploted_array,isodata_threshold,isodata_tolerance)
         change_isodata_threshold_val(new_threshold)
         isodata_threshold_slider.set(new_threshold)
         refresh_image()
@@ -263,7 +275,7 @@ def filters_window():
     def change_gaussian_val(val):
         global gaussian_intensity
         gaussian_intensity = int(val)
-        filters.gaussian(nii_2d_image,gaussian_intensity)
+        filters.gaussian(ploted_array,gaussian_intensity)
         text_val = "Gaussian Intensity: " + str(gaussian_intensity)
         label_Gaussian.configure(text=text_val)
         refresh_image()
@@ -271,7 +283,7 @@ def filters_window():
     def change_ksize_val(val):
         global kernel_size_amount
         kernel_size_amount = int(val)
-        filters.laplacian(nii_2d_image,kernel_size_amount,scale_number, delta_factor)
+        filters.laplacian(ploted_array,kernel_size_amount,scale_number, delta_factor)
         text_val = "Kernel Size: " + str(kernel_size_amount)
         label_ksize.configure(text=text_val)
         refresh_image()
@@ -279,7 +291,7 @@ def filters_window():
     def change_scale_val(val):
         global scale_number
         scale_number = int(val)
-        filters.laplacian(nii_2d_image,kernel_size_amount,scale_number, delta_factor)
+        filters.laplacian(ploted_array,kernel_size_amount,scale_number, delta_factor)
         text_val = "Scale: " + str(scale_number)
         label_scale.configure(text=text_val)
         refresh_image()
@@ -287,7 +299,7 @@ def filters_window():
     def change_delta_val(val):
         global delta_factor
         delta_factor = int(val)
-        filters.laplacian(nii_2d_image,kernel_size_amount,scale_number, delta_factor)
+        filters.laplacian(ploted_array,kernel_size_amount,scale_number, delta_factor)
         text_val = "Delta: " + str(delta_factor)
         label_delta.configure(text=text_val)
         refresh_image()
@@ -295,7 +307,7 @@ def filters_window():
     def change_threshold_val(val):
         global threshold_value
         threshold_value = int(val)
-        filters.thresholding(nii_2d_image,threshold_value)
+        filters.thresholding(ploted_array,threshold_value)
         text_val = "Threshold: " + str(threshold_value)
         label_Threshold.configure(text=text_val)
         refresh_image()
@@ -313,6 +325,11 @@ def filters_window():
         text_val = "Tolerance: " + str(isodata_tolerance)
         label_Isodata_tolerance.configure(text=text_val)
     
+    def cancel_filter():
+        plot_image()
+        restore_sliders()
+        filters_window.destroy()
+        filters_button.configure(state="normal")
     
     # Toplevel object which will 
     # be treated as a new window
@@ -320,20 +337,24 @@ def filters_window():
     
     # deactivate the filters button while this windows is open to avoid repeated instances
     filters_button.configure(state="disabled")
+    filters_window.protocol("WM_DELETE_WINDOW", cancel_filter)
     
     # sets the title of the
     # Toplevel widget
     filters_window.title("Image Filters Selector")
  
     # sets the geometry of toplevel
-    filters_window.geometry("350x450")
+    filters_window.geometry("350x420")
+    filters_window.resizable(True, False)
+    # Set the maximum width of the window
+    filters_window.maxsize(700, filters_window.winfo_screenheight())
 
     # spacer
     ctk.CTkLabel(master=filters_window,text="Filtering Options", height=40).pack(pady=15)
     
     # frame grid for filters
     filters_frame = ctk.CTkScrollableFrame(master=filters_window, width=300,height=230, orientation="horizontal")
-    filters_frame.pack()
+    filters_frame.pack(fill="x", expand=True, padx=15)
     
     # Gaussian frame
     gaussian_frame = ctk.CTkFrame(master=filters_frame)
@@ -408,12 +429,12 @@ def filters_window():
     label_Threshold.pack()
 
     # Threshold  slider
-    threshold_slider = ctk.CTkSlider(master=thresholding_frame, from_=0, to=max_value, command=change_threshold_val, width=120)
+    threshold_slider = ctk.CTkSlider(master=thresholding_frame, from_=0, to=255, command=change_threshold_val, width=120)
     threshold_slider.set(100)
     threshold_slider.pack(pady=5)
     
     buttons_frame = tk.Frame(master=filters_window)
-    buttons_frame.pack(pady=15)
+    buttons_frame.pack(pady=25)
     
     
     # Isodata frame
@@ -450,8 +471,8 @@ def filters_window():
     isodata_apply_button.pack(pady=5)
     
     # cancel Button
-    cancel_filter = ctk.CTkButton(master=buttons_frame, text="Cancel",  command=lambda: [plot_image(),restore_sliders(),filters_window.destroy(),filters_button.configure(state="normal")])
-    cancel_filter.grid(row=0, column=0, padx=5, pady=5)
+    cancel_filter_button = ctk.CTkButton(master=buttons_frame, text="Cancel",  command=cancel_filter)
+    cancel_filter_button.grid(row=0, column=0, padx=5, pady=5)
     
     # apply filter Button
     apply_filter_button = ctk.CTkButton(master=buttons_frame, text="Apply Filter",  command=lambda: [filters_window.destroy(),filters_button.configure(state="normal")])
@@ -552,7 +573,7 @@ tools_button_frame = tk.Frame(canva_tools_frame)
 tools_button_frame.grid(row=0,column=0,pady=5)
 
 # Clear canva button
-clear_button = ctk.CTkButton(tools_button_frame, text="Clear Canvas", state="disabled", command=erase_selection)
+clear_button = ctk.CTkButton(tools_button_frame, text="Clear Selection", state="disabled", command=erase_selection)
 clear_button.pack(pady=5)
 
 # Filters button
