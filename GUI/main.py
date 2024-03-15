@@ -1,3 +1,4 @@
+import math
 import time
 import os
 import sys
@@ -33,7 +34,8 @@ gaussian_intensity = 0
 file_path = ""
 nii_2d_image = []
 nii_3d_image = []
-nii_3dimage_backup = []
+nii_display = []
+nii_3d_image_original = []
 slice_portion = 100
 kernel_size_amount = 5
 scale_number = 1
@@ -78,13 +80,13 @@ def plot_image():
     #mpl.rcParams['savefig.pad_inches'] = 0
     #print(slice_portion)
     # selecting a slice out of the 3d image
-    if(view_mode.get() == "Axial"):
-        if slice_portion >= 191: slice_portion = 190
-        nii_2d_image = nii_3d_image[:,:,slice_portion]
-    elif(view_mode.get() == "Coronal"):
+    if(view_mode.get() == "Coronal"): # im the y axis "Coronal"
         if slice_portion >= 191: slice_portion = 190
         nii_2d_image = nii_3d_image[:,slice_portion,:]
-    elif(view_mode.get() == "Sagittal"):
+    elif(view_mode.get() == "Axial"): # im the z axis "Axial"
+        if slice_portion >= 191: slice_portion = 190
+        nii_2d_image = nii_3d_image[:,:,slice_portion]
+    elif(view_mode.get() == "Sagittal"): # im the x axis "Sagital"
         if slice_portion >= 168: slice_portion = 167
         nii_2d_image = nii_3d_image[slice_portion,:,:]
         
@@ -135,7 +137,8 @@ def undoIt():
         print("An error occurred:", e)
 
 def add_image():
-    global file_path, pen_color, nii_2d_image, nii_3dimage_backup, nii_3d_image
+    global file_path, pen_color, nii_2d_image, nii_3d_image_original, nii_3d_image
+    filters.delete_temp()
     file_path = filedialog.askopenfilename(filetypes=[("NIfTI files", "*.nii")])
     if file_path:
         try:
@@ -146,7 +149,7 @@ def add_image():
             # getting data
             #nii_data = nii_file[:,:,slice_portion]
             nii_3d_image = nii_file[:,:,:]
-            nii_3dimage_backup = nii_3d_image
+            nii_3d_image_original = nii_3d_image
             
             # runs function to update background
             plot_image()
@@ -168,6 +171,7 @@ def change_slice_portion(val):
     slice_portion = int(val)
     text_val = "Slice: " + str(slice_portion)
     label_slice.configure(text=text_val)
+    erase_selection()
     plot_image()
 
 def change_tolerance_val(val):
@@ -222,14 +226,16 @@ def end_draw(event):
     pass
  
 def restore_original():
-    global pen_color
+    global pen_color, nii_3d_image, nii_3d_image_original
     picture_canvas.create_image(0, 0, image=picture_canvas.image, anchor="nw")
     plot_original = Image.open("temp/original.png")
     plot_original.save("temp/plot.png", format='png')
     selection_image = Image.new("RGB",(plot_original.width,plot_original.height),(0,0,0))
     pen_color = "#00cd00"
     mode_switch.select()
-    refresh_image()     
+    nii_3d_image = nii_3d_image_original
+    erase_selection()
+    plot_image()     
 
 def erase_selection():
     global pen_size, pen_color
@@ -247,7 +253,7 @@ def erase_selection():
 
 def filters_window():
     
-    global nii_2d_image
+    global nii_2d_image, nii_3d_image
     
     ploted_image = Image.open('temp/plot.png').convert('L')
     ploted_array = np.array(ploted_image)
@@ -274,7 +280,11 @@ def filters_window():
 
     def change_gaussian_val(val):
         global gaussian_intensity
-        gaussian_intensity = int(val)
+        # Truncate intensity to ensure it's an integer and make it odd
+        kernel_size = max(1, math.trunc(val))
+        if kernel_size % 2 == 0:
+            kernel_size += 1  # Make it odd if it's even
+        gaussian_intensity = int(kernel_size)
         filters.gaussian(ploted_array,gaussian_intensity)
         text_val = "Gaussian Intensity: " + str(gaussian_intensity)
         label_Gaussian.configure(text=text_val)
@@ -328,6 +338,10 @@ def filters_window():
     def cancel_filter():
         plot_image()
         restore_sliders()
+        filters_window.destroy()
+        filters_button.configure(state="normal")
+        
+    def apply_filter():
         filters_window.destroy()
         filters_button.configure(state="normal")
     
@@ -475,7 +489,7 @@ def filters_window():
     cancel_filter_button.grid(row=0, column=0, padx=5, pady=5)
     
     # apply filter Button
-    apply_filter_button = ctk.CTkButton(master=buttons_frame, text="Apply Filter",  command=lambda: [filters_window.destroy(),filters_button.configure(state="normal")])
+    apply_filter_button = ctk.CTkButton(master=buttons_frame, text="Apply Filter",  command=apply_filter)
     apply_filter_button.grid(row=0, column=1, padx=5, pady=5)
 
 def step():
@@ -490,6 +504,7 @@ def step():
     plt.savefig("temp/undo.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
 
 def apply_segmentation():
+    global nii_3d_image
     selection_image = Image.open("temp/selection_canvas.png")
     selection_array = np.array(selection_image)
     
@@ -527,17 +542,16 @@ def apply_segmentation():
     ploted_image = Image.open("temp/plot.png").convert('L')
     image_plot = np.array(ploted_image)
     
-    filters.regionGrowing(image_plot, tolerance_value)
-    refresh_image()
+    #filters.regionGrowing2D(image_plot, tolerance_value)
+    nii_3d_image = filters.regionGrowing3D(nii_3d_image, tolerance_value, slice_portion, view_mode.get())
+    
+    plot_image()
+    #refresh_image()
         
 
 # left Frame which contains the tools and options
 left_frame = ctk.CTkFrame(root, height=screen_height)
 left_frame.pack(side='left', fill='y')
-
-# Create a Canvas scrollable frame widget for left frame
-#left_frame_canvas_scroll = ctk.CTkScrollableFrame(left_frame, height=screen_height, orientation="vertical")
-#left_frame_canvas_scroll.pack(side='left', fill='both', expand=True)
 
 # Create a Canvas widget for left frame
 left_frame_canvas = ctk.CTkFrame(left_frame, height=screen_height)

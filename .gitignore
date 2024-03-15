@@ -1,5 +1,6 @@
 venv/
-temp/
+temp/*
+output/*
 
 .DS_Store
 

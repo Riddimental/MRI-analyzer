@@ -1,6 +1,7 @@
 import math
 import time
 import numpy as np
+import nibabel as nib
 #np.set_printoptions(threshold=sys.maxsize)
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -50,7 +51,7 @@ def thresholding(data, threshold):
 def isodata(image_data, threshold_0=200, tolerance= 0.001):
    iteraciones = 0
    threshold = threshold_0
-   print("data",image_data[0,1])
+   # print("data",image_data[0,1])
 
    while True:
 
@@ -112,7 +113,7 @@ def get_white_pixels(image):
 
     return white_pixels
 
-def regionGrowing(image, threshold):
+def regionGrowing2D(image, threshold):
    # Create a mask to keep track of visited pixels
    visited_mask = np.zeros_like(image, dtype=bool)
 
@@ -131,6 +132,7 @@ def regionGrowing(image, threshold):
    # load visited mask png image
    visited_image = Image.open("temp/visited_mask.png").convert('L')
    visited_tuples = get_white_pixels(visited_image)
+   
    # Set visited pixels to True in the mask
    for x, y in visited_tuples:
       visited_mask[y, x] = True
@@ -166,3 +168,115 @@ def regionGrowing(image, threshold):
    time.sleep(0.0016)
    grownRegion_image_plot.imshow(segmented_image, cmap='gray')
    plt.savefig("temp/plot.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
+   
+def regionGrowing3D(image3d, threshold, slice, view_mode):
+   # Get image dimensions
+   height_x, width_y, depth_z = image3d.shape
+   
+   # Create a mask to keep track of visited pixels
+   visited_3dmask = np.zeros_like(image3d, dtype=bool)
+   #print("visited shape",visited_3dmask.shape) #visited shape (176, 192, 192)
+
+   # Initialize segmented image
+   segmented_3dimage = np.zeros_like(image3d)
+
+   # Define 3d 6-connectivity neighbors
+   # center is (0,0,0)
+   neighbors6 = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
+   
+   # Define 3d 26-connectivity neighbors
+   # center is (0,0,0)
+   #neighbors26 = [(dx, dy, dz) for dx in range(-1, 2) for dy in range(-1, 2) for dz in range(-1, 2) if (dx, dy, dz) != (0, 0, 0)]
+   #print(neighbors2)
+   
+   # Load PNG image of selected region
+   selected_image = Image.open("temp/green_mask.png").transpose(Image.FLIP_TOP_BOTTOM)
+   #print("selected size:", selected_image.size)  # selected size: (406, 443)
+
+   # load visited mask png image
+   visited_image = Image.open("temp/visited_mask.png").convert('L')
+   if view_mode == "Coronal":  # im the y axis
+      new_size = (176, 192)
+   elif view_mode == "Axial":  # im the z axis
+      new_size = (176, 192)
+   elif view_mode == "Sagittal":  # im the x axis
+      new_size = (192, 192)
+
+   # Resize the selected and visited images
+   selected_image = selected_image.resize(new_size)
+   visited_image = visited_image.resize(new_size)
+   
+   #print("selected image new shape is", visited_image.size)
+   starting_tuples = get_white_pixels(selected_image)
+   starting_triples = []
+
+   visited_tuples = get_white_pixels(visited_image)
+   visited_triples = []
+   
+   # Set visited pixels to True in the mask depending on the slice and the viewing angle
+   # and setting the selection plane depending on how it was shown to the user
+   if(view_mode == "Coronal"): # im the y axis, bottom to top
+      # Transform list of tuples into triples
+      visited_triples = [(x, slice, y) for x, y in visited_tuples]
+      starting_triples = [(x, slice, y) for x, y in starting_tuples]
+      for x, y, z in visited_triples:
+         visited_3dmask[x, y, z] = True
+   elif(view_mode == "Axial"): # im the z axis, back to front
+      visited_triples = [(x, y, slice) for x, y in visited_tuples]
+      starting_triples = [(x, y, slice) for x, y in starting_tuples]
+      for x, y, z in visited_triples:
+         visited_3dmask[x, y, z] = True
+   elif(view_mode == "Sagittal"): # im the x axis, left to right
+      visited_triples = [(slice, x, y) for x, y in visited_tuples]
+      starting_triples = [(slice, x, y) for x, y in starting_tuples]
+      for x, y, z in visited_triples:
+         visited_3dmask[x, y, z] = True
+   
+
+   # Perform region growing
+   stack = starting_triples
+   count = 0
+   seed_value = 0
+   while stack:
+      x, y, z = stack.pop()
+      segmented_3dimage[x, y, z] = 255  # Mark pixel as part of the segmented region
+      visited_3dmask[x, y, z] = True  # Mark pixel as visited
+      
+      # Update seed value and count for dynamic mean calculation
+      count += 1
+      seed_value += (image3d[x, y, z] - seed_value) / count
+
+      # Check 3d 6-connectivity neighbors
+      for dx, dy, dz in neighbors6:
+         nx, ny, nz = x + dx, y + dy, z + dz
+         # Check if neighbor is within image bounds and not visited
+         if 0 <= ny < width_y and 0 <= nx < height_x and 0 <= nz < depth_z and not visited_3dmask[nx, ny, nz]:
+               # Check intensity difference
+               if abs(int(image3d[nx, ny, nz]) - int(seed_value)) < threshold:
+                  stack.append((nx, ny, nz))
+                    
+   # GrownRegion image
+   grownRegion_fig = plt.figure(facecolor='black')
+   grownRegion_image_plot = grownRegion_fig.add_subplot(111)
+   plt.xticks([])
+   plt.yticks([])
+   time.sleep(0.0016)
+
+   # Rotar la imagen 90 grados en sentido horario intercambiando las dimensiones
+   if view_mode == "Coronal":  # im the y axis
+      rotated_image = np.rot90(segmented_3dimage[:, slice, :])
+   elif view_mode == "Axial":  # im the z axis
+      rotated_image = np.rot90(segmented_3dimage[:, :, slice])
+   elif view_mode == "Sagittal":  # im the x axis
+      rotated_image = np.rot90(segmented_3dimage[slice, :, :])
+
+   grownRegion_image_plot.imshow(rotated_image, cmap='gray')
+   plt.savefig("temp/plot.png", format='png', dpi=120, bbox_inches='tight', pad_inches=0)
+   
+   # Assuming your 3D matrix is named 'matrix'
+   # Create a NIfTI image object
+   #nii_output = nib.Nifti1Image(segmented_3dimage, affine=np.eye(4))
+
+   # Save the NIfTI image to a file
+   #nib.save(nii_output, 'output/output.nii')
+   return segmented_3dimage
