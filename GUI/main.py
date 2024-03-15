@@ -29,7 +29,7 @@ root.resizable(False, False)
 # Defining global variables
 max_value = 0
 pen_color = ""
-pen_size = 7
+pen_size = 5
 gaussian_intensity = 0
 file_path = ""
 nii_2d_image = []
@@ -91,7 +91,7 @@ def plot_image():
         nii_2d_image = nii_3d_image[slice_portion,:,:]
         
     # to find the range of the threshold slider
-    max_value = nii_2d_image[nii_2d_image > 0].flatten().max()
+    max_value = nii_3d_image[nii_3d_image > 0].flatten().max()
     
     # plotting data
     plt.axes(frameon=False)
@@ -262,21 +262,14 @@ def filters_window():
         global threshold_value,gaussian_intensity,slice_portion,kernel_size_amount, scale_number, delta_factor
         gaussian_intensity=0
         gaussian_slider.set(0)
-        kernel_size_amount=5
-        ksize_slider.set(5)
-        scale_number=1
-        scale_slider.set(1)
-        delta_factor=0
-        delta_slider.set(0)
         threshold_value=100
         threshold_slider.set(100)
         isodata_threshold_slider.set(100)
         
     def apply_isodata():
-        new_threshold = filters.isodata(ploted_array,isodata_threshold,isodata_tolerance)
-        change_isodata_threshold_val(new_threshold)
-        isodata_threshold_slider.set(new_threshold)
-        refresh_image()
+        global nii_3d_image,isodata_threshold, isodata_tolerance
+        nii_3d_image = filters.isodata(nii_3d_image,isodata_threshold,isodata_tolerance)
+        plot_image()
 
     def change_gaussian_val(val):
         global gaussian_intensity
@@ -284,43 +277,22 @@ def filters_window():
         kernel_size = max(1, math.trunc(val))
         if kernel_size % 2 == 0:
             kernel_size += 1  # Make it odd if it's even
-        gaussian_intensity = int(kernel_size)
+        gaussian_intensity = kernel_size
         filters.gaussian(ploted_array,gaussian_intensity)
         text_val = "Gaussian Intensity: " + str(gaussian_intensity)
         label_Gaussian.configure(text=text_val)
         refresh_image()
               
-    def change_ksize_val(val):
-        global kernel_size_amount
-        kernel_size_amount = int(val)
-        filters.laplacian(ploted_array,kernel_size_amount,scale_number, delta_factor)
-        text_val = "Kernel Size: " + str(kernel_size_amount)
-        label_ksize.configure(text=text_val)
-        refresh_image()
-        
-    def change_scale_val(val):
-        global scale_number
-        scale_number = int(val)
-        filters.laplacian(ploted_array,kernel_size_amount,scale_number, delta_factor)
-        text_val = "Scale: " + str(scale_number)
-        label_scale.configure(text=text_val)
-        refresh_image()
-        
-    def change_delta_val(val):
-        global delta_factor
-        delta_factor = int(val)
-        filters.laplacian(ploted_array,kernel_size_amount,scale_number, delta_factor)
-        text_val = "Delta: " + str(delta_factor)
-        label_delta.configure(text=text_val)
-        refresh_image()
-        
     def change_threshold_val(val):
         global threshold_value
         threshold_value = int(val)
-        filters.thresholding(ploted_array,threshold_value)
         text_val = "Threshold: " + str(threshold_value)
         label_Threshold.configure(text=text_val)
-        refresh_image()
+        
+    def apply_threshold():
+        global threshold_value, nii_3d_image
+        nii_3d_image = filters.thresholding(nii_3d_image,threshold_value)
+        plot_image()
         
     def change_isodata_threshold_val(val):
         global isodata_threshold
@@ -335,15 +307,17 @@ def filters_window():
         text_val = "Tolerance: " + str(isodata_tolerance)
         label_Isodata_tolerance.configure(text=text_val)
     
+    def apply_gaussian_3d():
+        global nii_3d_image, gaussian_intensity
+        nii_3d_image = filters.gaussian3d(nii_3d_image,gaussian_intensity)
+        plot_image()
+    
     def cancel_filter():
         plot_image()
         restore_sliders()
         filters_window.destroy()
         filters_button.configure(state="normal")
-        
-    def apply_filter():
-        filters_window.destroy()
-        filters_button.configure(state="normal")
+
     
     # Toplevel object which will 
     # be treated as a new window
@@ -388,46 +362,10 @@ def filters_window():
     gaussian_slider = ctk.CTkSlider(master=gaussian_frame, from_=1, to=13 , command=change_gaussian_val, width=120)
     gaussian_slider.set(0)
     gaussian_slider.pack(pady=5)
-
     
-    # Laplacian frame
-    laplacian_frame = ctk.CTkFrame(master=filters_frame)
-    laplacian_frame.grid(row=0, column=1, padx=15, pady=5)
-    #laplacian_frame.pack()
-    
-    # Laplacian Label
-    laplacian_label = ctk.CTkLabel(master=laplacian_frame, text="Laplacian Options", height=10)
-    laplacian_label.pack(pady=15)
-    
-    # Label for the ksize slider
-    text_val = "Kernel Size: " + str(kernel_size_amount)
-    label_ksize = ctk.CTkLabel(master=laplacian_frame, text=text_val)
-    label_ksize.pack()
-
-    # ksize slider
-    ksize_slider = ctk.CTkSlider(master=laplacian_frame, from_=0, to=13, command=change_ksize_val, width=120)
-    ksize_slider.set(5)
-    ksize_slider.pack(pady=5)
-    
-    # Label for the scale slider
-    text_val = "Scale: " + str(scale_number)
-    label_scale = ctk.CTkLabel(master=laplacian_frame, text=text_val)
-    label_scale.pack()
-
-    # scale slider
-    scale_slider = ctk.CTkSlider(master=laplacian_frame, from_=1, to=10, command=change_scale_val, width=120)
-    scale_slider.set(1)
-    scale_slider.pack(pady=5)
-    
-    # Label for the scale slider
-    text_val = "Delta: " + str(delta_factor)
-    label_delta = ctk.CTkLabel(master=laplacian_frame, text=text_val)
-    label_delta.pack()
-
-    # scale slider
-    delta_slider = ctk.CTkSlider(master=laplacian_frame, from_=1, to=10, command=change_delta_val, width=120)
-    delta_slider.set(1)
-    delta_slider.pack(pady=5)
+    # Gaussian button
+    gaussian_button = ctk.CTkButton(master=gaussian_frame, text="Apply Gaussian", command=apply_gaussian_3d, width=120)
+    gaussian_button.pack(pady=5)
     
     # Thresholding frame
     thresholding_frame = ctk.CTkFrame(master=filters_frame)
@@ -443,9 +381,13 @@ def filters_window():
     label_Threshold.pack()
 
     # Threshold  slider
-    threshold_slider = ctk.CTkSlider(master=thresholding_frame, from_=0, to=255, command=change_threshold_val, width=120)
+    threshold_slider = ctk.CTkSlider(master=thresholding_frame, from_=0, to=max_value, command=change_threshold_val, width=120)
     threshold_slider.set(100)
     threshold_slider.pack(pady=5)
+    
+    # An apply button for Threshold iterations
+    threshold_apply_button = ctk.CTkButton(master=thresholding_frame, text ="Apply Threshold", command=apply_threshold)
+    threshold_apply_button.pack(pady=5)
     
     buttons_frame = tk.Frame(master=filters_window)
     buttons_frame.pack(pady=25)
@@ -453,7 +395,7 @@ def filters_window():
     
     # Isodata frame
     isodata_frame = ctk.CTkFrame(master=filters_frame)
-    isodata_frame.grid(row=0, column=3, padx=15, pady=5)
+    isodata_frame.grid(row=0, column=1, padx=15, pady=5)
     #gaussian_frame.pack()
     
     # isodata options label
@@ -481,16 +423,16 @@ def filters_window():
     isodata_tolerance_slider.pack(pady=5)
     
     # An apply button for isodata iterations
-    isodata_apply_button = ctk.CTkButton(master=isodata_frame, text ="Preview Isodata", command=apply_isodata)
+    isodata_apply_button = ctk.CTkButton(master=isodata_frame, text ="Apply Isodata", command=apply_isodata)
     isodata_apply_button.pack(pady=5)
     
     # cancel Button
-    cancel_filter_button = ctk.CTkButton(master=buttons_frame, text="Cancel",  command=cancel_filter)
+    cancel_filter_button = ctk.CTkButton(master=buttons_frame, text="Close",  command=cancel_filter)
     cancel_filter_button.grid(row=0, column=0, padx=5, pady=5)
     
-    # apply filter Button
-    apply_filter_button = ctk.CTkButton(master=buttons_frame, text="Apply Filter",  command=apply_filter)
-    apply_filter_button.grid(row=0, column=1, padx=5, pady=5)
+    # restore filters button
+    restore_button_filter = ctk.CTkButton(buttons_frame, text="Restore Original", command=restore_original)
+    restore_button_filter.grid(row=0, column=1, padx=5, pady=5)
 
 def step():
     undo_image = Image.open("temp/plot.png")
@@ -547,7 +489,7 @@ def apply_segmentation():
     
     plot_image()
     #refresh_image()
-        
+    
 
 # left Frame which contains the tools and options
 left_frame = ctk.CTkFrame(root, height=screen_height)

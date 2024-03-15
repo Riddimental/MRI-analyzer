@@ -29,7 +29,7 @@ def delete_temp():
       print(f"The folder {folder_path} does not exist.")
 
 def gaussian(data, intensity):
-   data = cv2.GaussianBlur(data,(math.trunc(intensity),math.trunc(intensity)),0)
+   data = cv2.GaussianBlur(data,(intensity,intensity),0)
    #print("data",data)
    plt.imshow(data, cmap="gray")
    plt.xticks([])
@@ -37,28 +37,26 @@ def gaussian(data, intensity):
    time.sleep(0.0016)
    plt.savefig("temp/plot.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
    
+def gaussian3d(data3D, intensity):
+   data = cv2.GaussianBlur(data3D,(intensity,intensity),0)
+   return data
+   
+   
 def thresholding(data, threshold):
    transformed_image = data > threshold
    #print(transformed_image)
-   transformed_fig = plt.figure(facecolor='black')
-   transformed_image_plot = transformed_fig.add_subplot(111)
-   plt.xticks([])
-   plt.yticks([])
-   time.sleep(0.0016)
-   transformed_image_plot.imshow(transformed_image, cmap='gray')
-   plt.savefig("temp/plot.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
+   return transformed_image
    
 def isodata(image_data, threshold_0=200, tolerance= 0.001):
    iteraciones = 0
    threshold = threshold_0
-   # print("data",image_data[0,1])
-
+   
    while True:
 
-      # umbralizacion
+      # Thresholding
       iterated_image = image_data > threshold
 
-      # hallamos el promedio
+      # find the mean
       m_region_of_interest = image_data[iterated_image == 1].mean()
       m_background = image_data[iterated_image == 0].mean()
 
@@ -71,25 +69,7 @@ def isodata(image_data, threshold_0=200, tolerance= 0.001):
 
       threshold = new_threshold
       
-   
-   # isodata image
-   isodata_fig = plt.figure(facecolor='black')
-   isodata_image_plot = isodata_fig.add_subplot(111)
-   plt.xticks([])
-   plt.yticks([])
-   time.sleep(0.0016)
-   isodata_image_plot.imshow(iterated_image, cmap='gray')
-   plt.savefig("temp/plot.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
-   #print("Isodata applied")
-   return new_threshold
-   
-def laplacian(data,inksize,inscale,indelta):
-   data = cv2.Laplacian(data, -1, ksize=inksize, scale=inscale, delta=indelta, borderType=cv2.BORDER_DEFAULT)
-   plt.imshow(data, cmap="gray")
-   plt.xticks([])
-   plt.yticks([])
-   time.sleep(0.0016)
-   plt.savefig("temp/plot.png", format='png', dpi= 120, bbox_inches='tight', pad_inches=0)
+   return iterated_image
 
 def get_white_pixels(image):
     # Convert image to grayscale if it's not already

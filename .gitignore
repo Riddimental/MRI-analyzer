@@ -1,6 +1,5 @@
 venv/
 temp/*
-output/*
 
 .DS_Store
 
