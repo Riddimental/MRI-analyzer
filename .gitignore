@@ -1,5 +1,5 @@
 venv/
-temp/*
+GUI/temp/*.png
 
 .DS_Store
 

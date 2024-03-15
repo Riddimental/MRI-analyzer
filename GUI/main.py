@@ -26,6 +26,14 @@ root.title("MRI Segmentation Tool")
 # Make the window not resizable
 root.resizable(False, False)
 
+# Ruta del directorio "temp"
+temp_directory = "temp"
+
+# Verificar si el directorio no existe
+if not os.path.exists(temp_directory):
+    # Crear el directorio "temp" si no existe
+    os.makedirs(temp_directory)
+
 # Defining global variables
 max_value = 0
 pen_color = ""
