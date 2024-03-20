@@ -9,13 +9,14 @@ import nibabel as nib
 import matplotlib.pyplot as plt
 import filters
 from tkinter import Toplevel, filedialog
+import napari
 from PIL import Image, ImageTk, ImageDraw
 
 root = ctk.CTk()
 
 # Window dimensions and centering
 window_width = 800
-window_height = 600
+window_height = 620
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
 ctk.set_appearance_mode="dark"
@@ -39,6 +40,7 @@ max_value = 0
 pen_color = ""
 pen_size = 5
 gaussian_intensity = 0
+k_means_value = 0
 file_path = ""
 nii_2d_image = []
 nii_3d_image = []
@@ -65,6 +67,19 @@ def close_program():
     
 root.protocol("WM_DELETE_WINDOW", close_program)
 
+def open_napari():
+    global nii_3d_image
+    viewer = napari.Viewer()
+    viewer.add_image(nii_3d_image, name='3D Image')
+    viewer.dims.ndisplay = 3
+    
+    # Hide the layer controls
+    viewer.window.qt_viewer.dockLayerControls.toggleViewAction().trigger()
+    viewer.window.qt_viewer.dockLayerList.toggleViewAction().trigger()
+
+    # Show the viewer
+    viewer.window.show()
+
 # function to refresh the canva with the lates plot update
 def refresh_image():
     global selection_image
@@ -85,8 +100,6 @@ def refresh_image():
 def plot_image():
     global max_value, nii_2d_image, nii_3d_image, pen_color, slice_portion
     
-    #mpl.rcParams['savefig.pad_inches'] = 0
-    #print(slice_portion)
     # selecting a slice out of the 3d image
     if(view_mode.get() == "Coronal"): # im the y axis "Coronal"
         if slice_portion >= 191: slice_portion = 190
@@ -113,6 +126,7 @@ def plot_image():
     time.sleep(0.0008)
     plt.savefig("temp/plot.png", format='png', dpi= 120, bbox_inches='tight', pad_inches=0)
     plt.savefig("temp/original.png", format='png', dpi= 120, bbox_inches='tight', pad_inches=0)
+    #plt.close()
     
     refresh_image()
     
@@ -130,8 +144,9 @@ def plot_image():
     label_pen_size.grid(row=9,pady=5)
     pen_size_scale.grid(row=10)
     segmentation_tools_frame.grid(row=13,pady=5,padx=20)
-    restore_button.grid(row=14,pady=10,padx=20)
-    undo_button.grid(row=15,pady=10,padx=20)
+    restore_button.grid(row=14,pady=5,padx=20)
+    view_3D_button.grid(row=15,pady=5,padx=20)
+    save_button.grid(row=16,pady=5,padx=20)
     pen_color="#00cd00"
     
 def undoIt():
@@ -245,6 +260,22 @@ def restore_original():
     erase_selection()
     plot_image()     
 
+def save_file():
+    global nii_3d_image
+    # obtain the data
+    data = nii_3d_image
+    
+    # Open dialog window to save the file
+    file_path = filedialog.asksaveasfilename(defaultextension=".nii", filetypes=[("NIfTI files", "*.nii"), ("All files", "*.*")])
+    
+    # If the user cancels, the path will be empty
+    if not file_path:
+        return
+    
+    # Create a NIfTI From the data
+    nii_file = nib.Nifti1Image(data, np.eye(4))  # Reemplaza 'np.eye(4)' con tu transformación afín si es necesario
+    nib.save(nii_file, file_path)
+
 def erase_selection():
     global pen_size, pen_color
     plot_image = Image.open("temp/plot.png")
@@ -259,6 +290,65 @@ def erase_selection():
     mode_switch.select()
     refresh_image()     
 
+def step():
+    undo_image = Image.open("temp/plot.png")
+    undo_image_array = np.array(undo_image)
+    
+    unfo_fig = plt.figure(facecolor='black')
+    undo_plot = unfo_fig.add_subplot(111)
+    undo_image = plt.imshow(undo_image_array, cmap='gray')
+    plt.xticks([])
+    plt.yticks([])
+    plt.savefig("temp/undo.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
+    #plt.close()
+
+def apply_segmentation():
+    global nii_3d_image
+    selection_image = Image.open("temp/selection_canvas.png")
+    selection_array = np.array(selection_image)
+    
+    step()
+    
+    red_mask = (selection_array[:,:,0] > 200)
+    red_mask_fig = plt.figure(facecolor='black')
+    red_mask_plot = red_mask_fig.add_subplot(111)
+    red_mask_image = plt.imshow(red_mask, cmap='gray')
+    plt.xticks([])
+    plt.yticks([])
+    plt.savefig("temp/red_mask.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
+    #plt.close()
+    time.sleep(0.0016)
+    
+    green_mask = (selection_array[:,:,1] > 200)
+    green_mask_fig = plt.figure(facecolor='black')
+    green_mask_plot = green_mask_fig.add_subplot(111)
+    green_mask_plot.imshow(green_mask, cmap='gray')
+    plt.xticks([])
+    plt.yticks([])
+    time.sleep(0.0016)
+    plt.savefig("temp/green_mask.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
+    #plt.close()
+    
+    visited_mask = np.logical_or(selection_array[:,:,1] > 200, selection_array[:,:,0] > 200)
+    visited_mask_fig = plt.figure(facecolor='black')
+    visited_mask_plot = visited_mask_fig.add_subplot(111)
+    visited_mask_plot.imshow(visited_mask, cmap='gray')
+    plt.xticks([])
+    plt.yticks([])
+    time.sleep(0.0016)
+    plt.savefig("temp/visited_mask.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
+    #plt.close()
+    
+    #original_image = Image.open("temp/original.png").convert('L')
+    ploted_image = Image.open("temp/plot.png").convert('L')
+    image_plot = np.array(ploted_image)
+    
+    #filters.regionGrowing2D(image_plot, tolerance_value)
+    nii_3d_image = filters.regionGrowing3D(nii_3d_image, tolerance_value, slice_portion, view_mode.get())
+    
+    plot_image()
+    #refresh_image()
+
 def filters_window():
     
     global nii_2d_image, nii_3d_image
@@ -269,6 +359,7 @@ def filters_window():
     def restore_sliders():
         global threshold_value,gaussian_intensity,slice_portion,kernel_size_amount, scale_number, delta_factor
         gaussian_intensity=0
+        k_means_value
         gaussian_slider.set(0)
         threshold_value=100
         threshold_slider.set(100)
@@ -286,16 +377,25 @@ def filters_window():
         if kernel_size % 2 == 0:
             kernel_size += 1  # Make it odd if it's even
         gaussian_intensity = kernel_size
-        filters.gaussian(ploted_array,gaussian_intensity)
+        filters.gaussian2d(ploted_array,gaussian_intensity)
         text_val = "Gaussian Intensity: " + str(gaussian_intensity)
         label_Gaussian.configure(text=text_val)
         refresh_image()
               
+    def change_k_val(val):
+        global k_means_value
+        k_means_value = max(1, math.trunc(val))
+        text_val = "Random Points: " + str(k_means_value)
+        label_K_means.configure(text=text_val)
+        
+    
     def change_threshold_val(val):
-        global threshold_value
+        global threshold_value, nii_2d_image
         threshold_value = int(val)
         text_val = "Threshold: " + str(threshold_value)
         label_Threshold.configure(text=text_val)
+        filters.thresholding2d(nii_2d_image, threshold_value)
+        refresh_image()
         
     def apply_threshold():
         global threshold_value, nii_3d_image
@@ -318,6 +418,12 @@ def filters_window():
     def apply_gaussian_3d():
         global nii_3d_image, gaussian_intensity
         nii_3d_image = filters.gaussian3d(nii_3d_image,gaussian_intensity)
+        plot_image()
+    
+    def apply_k_means():
+        global nii_3d_image, k_means_value
+        nii_3d_image = filters.kmeans_segmentation_3d(nii_3d_image, k_means_value)
+        #nii_3d_image = filters.k_means(nii_3d_image,k_means_value)
         plot_image()
     
     def cancel_filter():
@@ -375,6 +481,28 @@ def filters_window():
     gaussian_button = ctk.CTkButton(master=gaussian_frame, text="Apply Gaussian", command=apply_gaussian_3d, width=120)
     gaussian_button.pack(pady=5)
     
+    # K-means frame
+    k_means_frame = ctk.CTkFrame(master=filters_frame)
+    k_means_frame.grid(row=0, column=1, padx=15, pady=5)
+    
+    # K-means slider
+    k_means_label = ctk.CTkLabel(master=k_means_frame, text="K-means Options", height=10)
+    k_means_label.pack(pady=15)
+
+    # Label for the K-means slider
+    text_val = "Random Points: " + str(k_means_value)
+    label_K_means = ctk.CTkLabel(master=k_means_frame, text=text_val)
+    label_K_means.pack()
+
+    # K-means filter slider
+    k_means_slider = ctk.CTkSlider(master=k_means_frame, from_=0, to=10, command=change_k_val, width=120)
+    k_means_slider.set(0)
+    k_means_slider.pack(pady=5)
+    
+    # K-means button
+    k_means_button = ctk.CTkButton(master=k_means_frame, text="Apply K-means", command=apply_k_means, width=120)
+    k_means_button.pack(pady=5)
+    
     # Thresholding frame
     thresholding_frame = ctk.CTkFrame(master=filters_frame)
     thresholding_frame.grid(row=0, column=2, padx=15, pady=5)
@@ -403,7 +531,7 @@ def filters_window():
     
     # Isodata frame
     isodata_frame = ctk.CTkFrame(master=filters_frame)
-    isodata_frame.grid(row=0, column=1, padx=15, pady=5)
+    isodata_frame.grid(row=0, column=3, padx=15, pady=5)
     #gaussian_frame.pack()
     
     # isodata options label
@@ -441,63 +569,6 @@ def filters_window():
     # restore filters button
     restore_button_filter = ctk.CTkButton(buttons_frame, text="Restore Original", command=restore_original)
     restore_button_filter.grid(row=0, column=1, padx=5, pady=5)
-
-def step():
-    undo_image = Image.open("temp/plot.png")
-    undo_image_array = np.array(undo_image)
-    
-    unfo_fig = plt.figure(facecolor='black')
-    undo_plot = unfo_fig.add_subplot(111)
-    undo_image = plt.imshow(undo_image_array, cmap='gray')
-    plt.xticks([])
-    plt.yticks([])
-    plt.savefig("temp/undo.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
-
-def apply_segmentation():
-    global nii_3d_image
-    selection_image = Image.open("temp/selection_canvas.png")
-    selection_array = np.array(selection_image)
-    
-    step()
-    
-    red_mask = (selection_array[:,:,0] > 200)
-    red_mask_fig = plt.figure(facecolor='black')
-    red_mask_plot = red_mask_fig.add_subplot(111)
-    red_mask_image = plt.imshow(red_mask, cmap='gray')
-    plt.xticks([])
-    plt.yticks([])
-    plt.savefig("temp/red_mask.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
-    time.sleep(0.0016)
-    
-    green_mask = (selection_array[:,:,1] > 200)
-    #print("green mask", green_mask[1,1])
-    green_mask_fig = plt.figure(facecolor='black')
-    green_mask_plot = green_mask_fig.add_subplot(111)
-    green_mask_plot.imshow(green_mask, cmap='gray')
-    plt.xticks([])
-    plt.yticks([])
-    time.sleep(0.0016)
-    plt.savefig("temp/green_mask.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
-    
-    visited_mask = np.logical_or(selection_array[:,:,1] > 200, selection_array[:,:,0] > 200)
-    visited_mask_fig = plt.figure(facecolor='black')
-    visited_mask_plot = visited_mask_fig.add_subplot(111)
-    visited_mask_plot.imshow(visited_mask, cmap='gray')
-    plt.xticks([])
-    plt.yticks([])
-    time.sleep(0.0016)
-    plt.savefig("temp/visited_mask.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
-    
-    #original_image = Image.open("temp/original.png").convert('L')
-    ploted_image = Image.open("temp/plot.png").convert('L')
-    image_plot = np.array(ploted_image)
-    
-    #filters.regionGrowing2D(image_plot, tolerance_value)
-    nii_3d_image = filters.regionGrowing3D(nii_3d_image, tolerance_value, slice_portion, view_mode.get())
-    
-    plot_image()
-    #refresh_image()
-    
 
 # left Frame which contains the tools and options
 left_frame = ctk.CTkFrame(root, height=screen_height)
@@ -632,8 +703,11 @@ segmentation_button.pack(pady=10)
 # Clear canva button
 restore_button = ctk.CTkButton(left_frame_canvas, text="Restore Original", command=restore_original)
 
+# 3D view button
+view_3D_button = ctk.CTkButton(left_frame_canvas,text="3D View",command=open_napari)
+
 # Process image segmentation button
-undo_button = ctk.CTkButton(left_frame_canvas, text="Undo", command=undoIt)
+save_button = ctk.CTkButton(left_frame_canvas, text="Save NIfTI", command=save_file)
 
 picture_canvas.bind("<Button-1>", start_draw)
 picture_canvas.bind("<B1-Motion>", draw)
