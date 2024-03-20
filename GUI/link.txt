@@ -1,7 +1,0 @@
-youtube:
-
-https://youtu.be/n1JFGVNttdI
-
-github:
-
-https://github.com/Riddimental/MRI-analyzer
