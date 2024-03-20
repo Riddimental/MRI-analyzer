@@ -1,5 +1,4 @@
 customtkinter
-tkinter
 scikit-learn
 numpy
 napari[all]
