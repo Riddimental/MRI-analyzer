@@ -31,12 +31,7 @@ def delete_temp():
 
 def gaussian2d(data, intensity):
    data = cv2.GaussianBlur(data,(intensity,intensity),0)
-   plt.imshow(data, cmap="gray")
-   plt.xticks([])
-   plt.yticks([])
-   time.sleep(0.0016)
-   plt.savefig("temp/plot.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
-   #plt.close()
+   plt.imsave("temp/plot.jpeg", data, cmap='gray')
    
 def kmeans_segmentation_3d(image3d, num_clusters):
    # Obtener la forma original de la imagen 3D
@@ -64,11 +59,7 @@ def thresholding(data, threshold):
    
 def thresholding2d(data, threshold):
    transformed_image = data > threshold
-   plt.imshow(transformed_image, cmap="gray")
-   plt.xticks([])
-   plt.yticks([])
-   time.sleep(0.0016)
-   plt.savefig("temp/plot.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
+   plt.imsave("temp/plot.jpeg", transformed_image, cmap='gray')
 
 def isodata(image_data, threshold_0=200, tolerance= 0.001):
    iteraciones = 0
@@ -95,85 +86,29 @@ def isodata(image_data, threshold_0=200, tolerance= 0.001):
    return iterated_image
 
 def get_white_pixels(image):
-    # Convert image to grayscale if it's not already
-    if image.mode != "L":
-        image = image.convert("L")
-
-    # Get image dimensions
-    width, height = image.size
-
-    # Initialize list to store white pixel coordinates
-    white_pixels = []
-
-    # Iterate through image pixels
-    for y in range(height):
-        for x in range(width):
-            # Get pixel value
-            pixel = image.getpixel((x, y))
-            # Check if pixel is white (255)
-            if pixel == 255:
-                white_pixels.append((x, y))
-
-    return white_pixels
-
-def regionGrowing2D(image, threshold):
-   # Create a mask to keep track of visited pixels
-   visited_mask = np.zeros_like(image, dtype=bool)
+   
+   # Convert image to grayscale if it's not already
+   if image.mode != "L":
+      image = image.convert("L")
 
    # Get image dimensions
-   height, width = image.shape[:2]
-   # Initialize segmented image
-   segmented_image = np.zeros_like(image)
+   width, height = image.size
 
-   # Define 4-connectivity neighbors
-   neighbors = [(1, 0), (-1, 0), (0, 1), (0, -1)
-               ,(-1,-1),(1,1),(-1,1),(1,-1) #it works the same with 8 or 4 neighbors, still dont know which one is more efficient
-               ]
-   # Load PNG image of selected region
-   selected_image = Image.open("temp/green_mask.png")
+   # Initialize list to store white pixel coordinates
+   white_pixels = []
 
-   # load visited mask png image
-   visited_image = Image.open("temp/visited_mask.png").convert('L')
-   visited_tuples = get_white_pixels(visited_image)
-   
-   # Set visited pixels to True in the mask
-   for x, y in visited_tuples:
-      visited_mask[y, x] = True
+   # Iterate through image pixels
+   for y in range(height):
+      for x in range(width):
+         # Get pixel value
+         pixel = image.getpixel((x, y))
+         # Check if pixel is white (255)
+         if pixel >= 200:
+               white_pixels.append((height - y,x))
 
-   # Perform region growing
-   starting_list = get_white_pixels(selected_image)
-   stack = starting_list
-   count = 0
-   seed_value = 0
-   while stack:
-      x, y = stack.pop()
-      segmented_image[y, x] = 255  # Mark pixel as part of the segmented region
-      visited_mask[y, x] = True  # Mark pixel as visited
-      
-      # Update seed value and count for dynamic mean calculation
-      count += 1
-      seed_value += (image[y, x] - seed_value) / count
+   return white_pixels
 
-      # Check 4-connectivity neighbors
-      for dx, dy in neighbors:
-         nx, ny = x + dx, y + dy
-         # Check if neighbor is within image bounds and not visited
-         if 0 <= nx < width and 0 <= ny < height and not visited_mask[ny, nx]:
-               # Check intensity difference
-               if abs(int(image[ny, nx]) - int(seed_value)) < threshold:
-                  stack.append((nx, ny))
-                    
-   # GrownRegion image
-   grownRegion_fig = plt.figure(facecolor='black')
-   grownRegion_image_plot = grownRegion_fig.add_subplot(111)
-   plt.xticks([])
-   plt.yticks([])
-   time.sleep(0.0016)
-   grownRegion_image_plot.imshow(segmented_image, cmap='gray')
-   plt.savefig("temp/plot.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
-   #plt.close()
-   
-def regionGrowing3D(image3d, threshold, slice, view_mode):
+def regionGrowing(image3d, threshold, seeds):
    # Get image dimensions
    height_x, width_y, depth_z = image3d.shape
    
@@ -187,46 +122,14 @@ def regionGrowing3D(image3d, threshold, slice, view_mode):
    # center is (0,0,0)
    neighbors6 = [(1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)]
    
-   # Load PNG image of selected region
-   selected_image = Image.open("temp/green_mask.png").transpose(Image.FLIP_TOP_BOTTOM)
-
-   # load visited mask png image
-   visited_image = Image.open("temp/visited_mask.png").convert('L')
-   if view_mode == "Coronal":  # im the y axis
-      new_size = (176, 192)
-   elif view_mode == "Axial":  # im the z axis
-      new_size = (176, 192)
-   elif view_mode == "Sagittal":  # im the x axis
-      new_size = (192, 192)
-
-   # Resize the selected and visited images
-   selected_image = selected_image.resize(new_size)
-   visited_image = visited_image.resize(new_size)
+   starting_triples = seeds
+   #starting_triples.append(seeds)
+   visited_triples = seeds
+   #visited_triples.append(seeds)
    
-   starting_tuples = get_white_pixels(selected_image)
-   starting_triples = []
-
-   visited_tuples = get_white_pixels(visited_image)
-   visited_triples = []
-   
-   # Set visited pixels to True in the mask depending on the slice and the viewing angle
-   # and setting the selection plane depending on how it was shown to the user
-   if(view_mode == "Coronal"): # im the y axis, bottom to top
-      # Transform list of tuples into triples
-      visited_triples = [(x, slice, y) for x, y in visited_tuples]
-      starting_triples = [(x, slice, y) for x, y in starting_tuples]
-      for x, y, z in visited_triples:
-         visited_3dmask[x, y, z] = True
-   elif(view_mode == "Axial"): # im the z axis, back to front
-      visited_triples = [(x, y, slice) for x, y in visited_tuples]
-      starting_triples = [(x, y, slice) for x, y in starting_tuples]
-      for x, y, z in visited_triples:
-         visited_3dmask[x, y, z] = True
-   elif(view_mode == "Sagittal"): # im the x axis, left to right
-      visited_triples = [(slice, x, y) for x, y in visited_tuples]
-      starting_triples = [(slice, x, y) for x, y in starting_tuples]
-      for x, y, z in visited_triples:
-         visited_3dmask[x, y, z] = True
+   # Set visited pixels to True in the mask 
+   for x, y, z in visited_triples:
+      visited_3dmask[x, y, z] = True
    
 
    # Perform region growing
@@ -250,28 +153,11 @@ def regionGrowing3D(image3d, threshold, slice, view_mode):
                # Check intensity difference
                if abs(int(image3d[nx, ny, nz]) - int(seed_value)) < threshold:
                   stack.append((nx, ny, nz))
-                    
-   # GrownRegion image
-   grownRegion_fig = plt.figure(facecolor='black')
-   grownRegion_image_plot = grownRegion_fig.add_subplot(111)
-   plt.xticks([])
-   plt.yticks([])
-   time.sleep(0.0016)
-
-   # Rotar la imagen 90 grados en sentido horario intercambiando las dimensiones
-   if view_mode == "Coronal":  # im the y axis
-      rotated_image = np.rot90(segmented_3dimage[:, slice, :])
-   elif view_mode == "Axial":  # im the z axis
-      rotated_image = np.rot90(segmented_3dimage[:, :, slice])
-   elif view_mode == "Sagittal":  # im the x axis
-      rotated_image = np.rot90(segmented_3dimage[slice, :, :])
-
-   grownRegion_image_plot.imshow(rotated_image, cmap='gray')
-   plt.savefig("temp/plot.png", format='png', dpi=120, bbox_inches='tight', pad_inches=0)
-   #plt.close()
 
    return segmented_3dimage
 
+
+'''
 def select_random_points(array3d, k):
     # Flatten the 3D array to 1D
     flat_indices = np.random.choice(array3d.size, k, replace=False)
@@ -321,4 +207,4 @@ def k_means3d(image3D, k=3, max_iters=300, tol=1e-4):
       # Store the index of the closest point
       segmented_image[x, y, z] = colors[closest_index]
 
-   return segmented_image
+   return segmented_image'''

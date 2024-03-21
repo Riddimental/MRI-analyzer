@@ -3,6 +3,7 @@ import time
 import os
 import sys
 import customtkinter as ctk
+import cv2
 import numpy as np
 import tkinter as tk
 import nibabel as nib
@@ -37,13 +38,15 @@ if not os.path.exists(temp_directory):
 
 # Defining global variables
 max_value = 0
-pen_color = ""
-pen_size = 5
+pen_color = "#00cd00"
+pen_size = 3
 gaussian_intensity = 0
 k_means_value = 0
 file_path = ""
+seeds = [] # this wil store all the (x,y,z) points that the user drew over
 nii_2d_image = []
 nii_3d_image = []
+nii_3d_selection = []
 nii_display = []
 nii_3d_image_original = []
 slice_portion = 100
@@ -53,10 +56,8 @@ delta_factor = 0
 threshold_value = 100
 isodata_tolerance = 0.001
 isodata_threshold = 200
-tolerance_value=20
+tolerance_value=30
 
-
-# Radio buttons (0) Axial, (1) Coronal, (2) Sagittal
 view_mode = ctk.StringVar(value="Axial")
 selection_image = Image.new("RGB",(200,200),(0,0,0))
 
@@ -84,8 +85,7 @@ def open_napari():
 def refresh_image():
     global selection_image
     # givin the function time to avoid over-refreshing
-    time.sleep(0.0008)
-    plot_image = Image.open("temp/plot.png")
+    plot_image = Image.open("temp/plot.jpeg")
     
     # adjusting the canvas to be the same size as the plot
     drawing_canvas.config(width=plot_image.width, height=plot_image.height)
@@ -112,25 +112,18 @@ def plot_image():
         nii_2d_image = nii_3d_image[slice_portion,:,:]
         
     # to find the range of the threshold slider
-    max_value = nii_3d_image[nii_3d_image > 0].flatten().max()
+    max_value = np.max(nii_3d_image)
     
-    # plotting data
-    plt.axes(frameon=False)
-    plt.figure(facecolor='black')
-    # rotate the figure 90 degrees
+    # rotate the figure 90 degrees and resize
+    nii_2d_image = np.array(nii_2d_image, dtype=np.float32)
     nii_2d_image = np.rot90(nii_2d_image)
-    plt.imshow(nii_2d_image, cmap='gray')
-    plt.xticks([])
-    plt.yticks([])
-    plt.autoscale(tight=True)
-    time.sleep(0.0008)
-    plt.savefig("temp/plot.png", format='png', dpi= 120, bbox_inches='tight', pad_inches=0)
-    plt.savefig("temp/original.png", format='png', dpi= 120, bbox_inches='tight', pad_inches=0)
-    #plt.close()
+    nii_2d_image = cv2.resize(nii_2d_image, None, fx=2.4, fy=2.4)  # Resize to twice the size
+
+    # Save the images
+    plt.imsave("temp/plot.jpeg", nii_2d_image, cmap='gray')
     
     refresh_image()
     
-    mode_switch.configure(state="normal")
     pen_size_scale.configure(state="normal")
     clear_button.configure(state="normal")
     #filters_button.configure(state="normal")
@@ -139,28 +132,16 @@ def plot_image():
     segmentation_button.configure(state="normal")
     Tolerance_slider.configure(state="normal")
     filters_button.configure(state="normal")
-    label_pen_mode.grid(row=7,pady=5)
-    mode_switch.grid(row=8, pady=5)
     label_pen_size.grid(row=9,pady=5)
     pen_size_scale.grid(row=10)
     segmentation_tools_frame.grid(row=13,pady=5,padx=20)
-    restore_button.grid(row=14,pady=5,padx=20)
-    view_3D_button.grid(row=15,pady=5,padx=20)
-    save_button.grid(row=16,pady=5,padx=20)
-    pen_color="#00cd00"
-    
-def undoIt():
-    try:
-        os.rename("temp/undo.png", "temp/plot.png")
-        refresh_image()
-        print("undone")
-    except FileNotFoundError:
-        print("No undo steps")
-    except Exception as e:
-        print("An error occurred:", e)
+    file_tools_frame.grid(row=14, column=0, pady=25, padx=20)
+    restore_button.pack(pady=5,padx=20)
+    view_3D_button.pack(pady=5,padx=20)
+    save_button.pack(pady=5,padx=20)
 
 def add_image():
-    global file_path, pen_color, nii_2d_image, nii_3d_image_original, nii_3d_image
+    global file_path, nii_2d_image, nii_3d_image_original, nii_3d_image, nii_3d_selection
     filters.delete_temp()
     file_path = filedialog.askopenfilename(filetypes=[("NIfTI files", "*.nii")])
     if file_path:
@@ -170,8 +151,8 @@ def add_image():
             nii_file.shape
             
             # getting data
-            #nii_data = nii_file[:,:,slice_portion]
             nii_3d_image = nii_file[:,:,:]
+            nii_3d_selection = np.zeros_like(nii_3d_image)
             nii_3d_image_original = nii_3d_image
             
             # runs function to update background
@@ -194,7 +175,6 @@ def change_slice_portion(val):
     slice_portion = int(val)
     text_val = "Slice: " + str(slice_portion)
     label_slice.configure(text=text_val)
-    erase_selection()
     plot_image()
 
 def change_tolerance_val(val):
@@ -204,20 +184,6 @@ def change_tolerance_val(val):
     text_val = "Tolerance: " + str(tolerance_value)
     label_tolerance.configure(text=text_val)
 
-def switch_event():
-    if(switch_var.get() == "on"):
-        include()
-    else:
-        exclude()
-
-def include():
-    global pen_color
-    pen_color = "#00cd00"
-    
-def exclude():
-    global pen_color
-    pen_color = "#FF0000"
-
 def draw(event):
     global last_x, last_y
     x, y = event.x, event.y
@@ -225,18 +191,18 @@ def draw(event):
     
     # Check if selection_canvas exists
     try:
-        draw_selection = Image.open("temp/selection_canvas.png")
+        draw_selection = Image.open("temp/green_mask.png")
     except FileNotFoundError:
         # Create a new image if selection_canvas doesn't exist
-        reference = Image.open('temp/plot.png')
+        reference = Image.open('temp/plot.jpeg')
         draw_selection = Image.new("RGB", (reference.width, reference.height), (0,0,0))
 
     
     # Draw on the canvas image
     draw = ImageDraw.Draw(draw_selection)
-    draw.line((last_x, last_y, x, y), fill=pen_color, width=pen_size*2)
-    drawing_canvas.create_line(last_x, last_y, x, y, fill=pen_color, width=pen_size*2, capstyle="round", smooth=True)
-    draw_selection.save("temp/selection_canvas.png", format='png')
+    draw.line((last_x, last_y, x, y), fill='white', width=pen_size*2)
+    drawing_canvas.create_line(last_x, last_y, x, y, fill='white', width=pen_size*2, capstyle="round", smooth=True)
+    draw_selection.save("temp/green_mask.png", format='png')
     
     last_x, last_y = x, y
 
@@ -245,19 +211,33 @@ def start_draw(event):
     last_x, last_y = event.x, event.y
 
 def end_draw(event):
-    #referencia.save()
-    pass
- 
+    global nii_3d_selection, slice_portion, drawing_canvas, seeds
+    
+    drawings = Image.open("temp/green_mask.png").convert('L')
+    drawings_resized = drawings.resize((int(drawings.width/2.4), int(drawings.height/2.4)))
+    selection = filters.get_white_pixels(drawings_resized)
+    
+    # this wil save the anotations in a 3d array copy of the original 3d image
+    for coord in selection:
+        x, y = coord
+        if view_mode.get() == "Coronal":  # eje y "Coronal"
+            slice_portion = min(slice_portion, 190)
+            point = (y, slice_portion, x)
+        elif view_mode.get() == "Axial":  # eje z "Axial"
+            slice_portion = min(slice_portion, 190)
+            point = (y , x, slice_portion)
+        elif view_mode.get() == "Sagittal":  # eje x "Sagital"
+            slice_portion = min(slice_portion, 167)
+            point = (slice_portion, y, x)
+
+        nii_3d_selection[point] = 200
+        seeds.append(point)
+        
+    os.remove("temp/green_mask.png")
+
 def restore_original():
-    global pen_color, nii_3d_image, nii_3d_image_original
-    picture_canvas.create_image(0, 0, image=picture_canvas.image, anchor="nw")
-    plot_original = Image.open("temp/original.png")
-    plot_original.save("temp/plot.png", format='png')
-    selection_image = Image.new("RGB",(plot_original.width,plot_original.height),(0,0,0))
-    pen_color = "#00cd00"
-    mode_switch.select()
+    global nii_3d_image, nii_3d_image_original
     nii_3d_image = nii_3d_image_original
-    erase_selection()
     plot_image()     
 
 def save_file():
@@ -277,93 +257,32 @@ def save_file():
     nib.save(nii_file, file_path)
 
 def erase_selection():
-    global pen_size, pen_color
-    plot_image = Image.open("temp/plot.png")
+    global nii_3d_selection, nii_3d_image
+    nii_3d_selection = np.zeros_like(nii_3d_image)
+    plot_image = Image.open("temp/plot.jpeg")
     drawing_canvas.delete("all")
-    selection_image = Image.new("RGB",(plot_image.width,plot_image.height),(0,0,0))
-    selection_image.save("temp/selection_canvas.png",format='png')
-    selection_image.save("temp/green_mask.png",format='png')
-    selection_image.save("temp/red_mask.png",format='png')
-    selection_image.save("temp/visited_mask.png",format='png')
-    pen_size_scale.set(7)
-    pen_color = "#00cd00"
-    mode_switch.select()
     refresh_image()     
 
-def step():
-    undo_image = Image.open("temp/plot.png")
-    undo_image_array = np.array(undo_image)
-    
-    unfo_fig = plt.figure(facecolor='black')
-    undo_plot = unfo_fig.add_subplot(111)
-    undo_image = plt.imshow(undo_image_array, cmap='gray')
-    plt.xticks([])
-    plt.yticks([])
-    plt.savefig("temp/undo.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
-    #plt.close()
-
 def apply_segmentation():
-    global nii_3d_image
-    selection_image = Image.open("temp/selection_canvas.png")
-    selection_array = np.array(selection_image)
+    global nii_3d_image, tolerance_value, seeds
     
-    step()
-    
-    red_mask = (selection_array[:,:,0] > 200)
-    red_mask_fig = plt.figure(facecolor='black')
-    red_mask_plot = red_mask_fig.add_subplot(111)
-    red_mask_image = plt.imshow(red_mask, cmap='gray')
-    plt.xticks([])
-    plt.yticks([])
-    plt.savefig("temp/red_mask.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
-    #plt.close()
-    time.sleep(0.0016)
-    
-    green_mask = (selection_array[:,:,1] > 200)
-    green_mask_fig = plt.figure(facecolor='black')
-    green_mask_plot = green_mask_fig.add_subplot(111)
-    green_mask_plot.imshow(green_mask, cmap='gray')
-    plt.xticks([])
-    plt.yticks([])
-    time.sleep(0.0016)
-    plt.savefig("temp/green_mask.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
-    #plt.close()
-    
-    visited_mask = np.logical_or(selection_array[:,:,1] > 200, selection_array[:,:,0] > 200)
-    visited_mask_fig = plt.figure(facecolor='black')
-    visited_mask_plot = visited_mask_fig.add_subplot(111)
-    visited_mask_plot.imshow(visited_mask, cmap='gray')
-    plt.xticks([])
-    plt.yticks([])
-    time.sleep(0.0016)
-    plt.savefig("temp/visited_mask.png", format='png', dpi= 120 , bbox_inches='tight', pad_inches=0)
-    #plt.close()
-    
-    #original_image = Image.open("temp/original.png").convert('L')
-    ploted_image = Image.open("temp/plot.png").convert('L')
-    image_plot = np.array(ploted_image)
-    
-    #filters.regionGrowing2D(image_plot, tolerance_value)
-    nii_3d_image = filters.regionGrowing3D(nii_3d_image, tolerance_value, slice_portion, view_mode.get())
-    
+    nii_3d_image = filters.regionGrowing(nii_3d_image, tolerance_value, seeds)
     plot_image()
-    #refresh_image()
 
 def filters_window():
     
     global nii_2d_image, nii_3d_image
     
-    ploted_image = Image.open('temp/plot.png').convert('L')
+    ploted_image = Image.open('temp/plot.jpeg').convert('L')
     ploted_array = np.array(ploted_image)
     
     def restore_sliders():
         global threshold_value,gaussian_intensity,slice_portion,kernel_size_amount, scale_number, delta_factor
         gaussian_intensity=0
-        k_means_value
         gaussian_slider.set(0)
-        threshold_value=100
         threshold_slider.set(100)
         isodata_threshold_slider.set(100)
+        
         
     def apply_isodata():
         global nii_3d_image,isodata_threshold, isodata_tolerance
@@ -665,13 +584,6 @@ title_label.grid(row=1, pady=5)
 upload_button = ctk.CTkButton(left_frame_canvas, text='Upload Image', command=add_image)
 upload_button.grid(row=2,pady=10, padx=20)
 
-
-# switch for include/eclude pen
-label_pen_mode = ctk.CTkLabel(master=left_frame_canvas, text="Pen Mode:")
-switch_var = ctk.StringVar(value="on")
-
-mode_switch = ctk.CTkSwitch(master=left_frame_canvas, text="Include", state="disabled", command=switch_event, variable=switch_var, onvalue="on", offvalue="off")
-
 # Pen size slider
 # Label for the slider
 text_val = "Pen Size: " + str(pen_size)
@@ -693,21 +605,24 @@ label_tolerance.pack(pady=5)
 
 # slider tolerance
 Tolerance_slider = ctk.CTkSlider(master=segmentation_tools_frame, from_=1, to=100,state="disabled", command=change_tolerance_val, width=120)
-Tolerance_slider.set(25)
+Tolerance_slider.set(30)
 Tolerance_slider.pack(pady=5)
 
 # Process image segmentation button
 segmentation_button = ctk.CTkButton(segmentation_tools_frame, text="Apply Region Growing", state="disabled", command=apply_segmentation)
-segmentation_button.pack(pady=10)
+segmentation_button.pack(pady=20)
+
+# file tools frame
+file_tools_frame = tk.Frame(left_frame_canvas)
 
 # Clear canva button
-restore_button = ctk.CTkButton(left_frame_canvas, text="Restore Original", command=restore_original)
+restore_button = ctk.CTkButton(file_tools_frame, text="Restore Original", command=restore_original)
 
 # 3D view button
-view_3D_button = ctk.CTkButton(left_frame_canvas,text="3D View",command=open_napari)
+view_3D_button = ctk.CTkButton(file_tools_frame,text="3D View",command=open_napari)
 
 # Process image segmentation button
-save_button = ctk.CTkButton(left_frame_canvas, text="Save NIfTI", command=save_file)
+save_button = ctk.CTkButton(file_tools_frame, text="Save NIfTI", command=save_file)
 
 picture_canvas.bind("<Button-1>", start_draw)
 picture_canvas.bind("<B1-Motion>", draw)
